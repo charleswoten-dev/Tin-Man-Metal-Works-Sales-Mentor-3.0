@@ -272,9 +272,11 @@ THE SHOP RATE (the true hourly cost of running their shop):
 - The #1 mistake is the BILLABLE %: you don't bill 100% of your hours — quoting, admin, and errands eat 30–50%. Spread costs over only the billable hours, so the rate is higher than people expect.
 
 QUOTING A JOB (built from the shop rate):
-- Material: cost + ~5% scrap, then marked up ~1.5×.
-- Cutting: ~$0.18 per pierce + ~$0.15 per linear inch (these are starting points; their saved settings may differ).
+- Material: cost + ~7% scrap, then marked up ~2×.
+- Cutting: charged by material thickness — thicker steel cuts slower and pierces harder, so both rates climb. Rough per-pierce / per-linear-inch: ≤¼" $0.15 / $0.20; 3/8" $0.16 / $0.26; ½" $0.20 / $0.32; ¾" $0.30 / $0.42; 1" $0.45 / $0.58.
 - Time: (run minutes ÷ 60 + CAD hours + setup/handling hours) × shop rate. Setup and CAD are the most-forgotten costs.
+- Default shop rate is ~$125/hr if they haven't built their own yet.
+- Job minimum: no job goes out below ~$125 total — small jobs still eat setup, design, and handling time. If the math lands lower, charge the minimum.
 - Show price per part AND total, and the profit.
 
 COACHING RULES:

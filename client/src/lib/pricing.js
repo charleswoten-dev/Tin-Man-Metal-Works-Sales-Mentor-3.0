@@ -8,6 +8,24 @@
 const WEEKS_PER_MONTH = 4.33;
 export const MARKET_FLOOR_HR = 35; // forum-sourced sanity floor
 
+// Charles's shop calibration (Tin Man Metal Works).
+export const DEFAULT_RATE_HR = 125; // fallback shop rate when none is saved yet
+export const JOB_MINIMUM = 125;     // no job goes out the door below this total
+
+// Thickness-driven cut/pierce pricing. Thicker steel = slower cut + harder
+// pierce, so both rates climb with thickness. `value` is the stored key.
+export const THICKNESS_TIERS = [
+  { value: '0.25',  label: '≤ ¼"',  cost_per_inch: 0.20, cost_per_pierce: 0.15 },
+  { value: '0.375', label: '3/8"',  cost_per_inch: 0.26, cost_per_pierce: 0.16 },
+  { value: '0.5',   label: '½"',    cost_per_inch: 0.32, cost_per_pierce: 0.20 },
+  { value: '0.75',  label: '¾"',    cost_per_inch: 0.42, cost_per_pierce: 0.30 },
+  { value: '1',     label: '1"',    cost_per_inch: 0.58, cost_per_pierce: 0.45 },
+];
+export const DEFAULT_THICKNESS = '0.25';
+
+const tierFor = (value) =>
+  THICKNESS_TIERS.find((t) => t.value === String(value)) || THICKNESS_TIERS[0];
+
 // Forum/industry-sourced defaults. Editable per user; calibrate to the real shop.
 export const RATE_DEFAULTS = {
   mode: 'cost',
@@ -24,14 +42,16 @@ export const RATE_DEFAULTS = {
   annual_expenses: 24000,
   work_weeks_yr: 50,
   // per-user job-calc defaults
-  material_markup: 1.5,
-  scrap_pct: 5,
-  cost_per_pierce: 0.18,
-  cost_per_inch: 0.15,
+  material_markup: 2,
+  scrap_pct: 7,
+  // Fallback cut rates (used if no thickness picked). Match the ≤¼" tier.
+  cost_per_pierce: 0.15,
+  cost_per_inch: 0.20,
 };
 
 export const QUOTE_DEFAULTS = {
   material_cost: 0,
+  thickness: DEFAULT_THICKNESS,
   pierces: 0,
   cut_inches: 0,
   run_minutes: 0,
@@ -103,27 +123,40 @@ export function computeQuote(q = {}, rateHr = 0, breakevenHr = 0, consts = {}) {
   const c = { ...RATE_DEFAULTS, ...consts };
   const qty = Math.max(1, num(q.quantity) || 1);
 
+  // No saved shop rate yet? Fall back to the shop default so quotes still work.
+  const sellRate = num(rateHr) > 0 ? num(rateHr) : DEFAULT_RATE_HR;
+  const costRate = num(breakevenHr) > 0 ? num(breakevenHr) : DEFAULT_RATE_HR;
+
+  // Cut/pierce rates come from the chosen material thickness.
+  const tier = tierFor(q.thickness);
+  const perPierce = tier.cost_per_pierce;
+  const perInch = tier.cost_per_inch;
+
   const scrapMult = 1 + num(c.scrap_pct) / 100;
   const materialReal = num(q.material_cost) * scrapMult;            // true material cost (with scrap)
   const materialBilled = materialReal * num(c.material_markup);     // marked-up to customer
 
-  const cutCost =
-    num(q.pierces) * num(c.cost_per_pierce) + num(q.cut_inches) * num(c.cost_per_inch);
+  const cutCost = num(q.pierces) * perPierce + num(q.cut_inches) * perInch;
 
   const timeHours = num(q.run_minutes) / 60 + num(q.cad_hours) + num(q.setup_hours);
-  const timeCost = timeHours * num(rateHr);
+  const timeCost = timeHours * sellRate;
 
   const unitPrice = materialBilled + cutCost + timeCost;
-  const totalPrice = unitPrice * qty;
+  const rawTotal = unitPrice * qty;
+
+  // Shop job minimum — no job leaves below this total.
+  const minApplied = rawTotal > 0 && rawTotal < JOB_MINIMUM;
+  const totalPrice = minApplied ? JOB_MINIMUM : rawTotal;
 
   // True cost to build one unit (uses break-even rate, raw material+scrap, cut cost).
-  const unitCost = materialReal + cutCost + timeHours * num(breakevenHr);
+  const unitCost = materialReal + cutCost + timeHours * costRate;
   const jobProfit = totalPrice - unitCost * qty;
   const jobProfitPct = totalPrice > 0 ? (jobProfit / totalPrice) * 100 : 0;
 
   return {
     unit_price: round2(unitPrice),
     total_price: round2(totalPrice),
+    raw_total: round2(rawTotal),
     unit_cost: round2(unitCost),
     job_profit: round2(jobProfit),
     job_profit_pct: round2(jobProfitPct),
@@ -131,7 +164,11 @@ export function computeQuote(q = {}, rateHr = 0, breakevenHr = 0, consts = {}) {
     cut_cost: round2(cutCost),
     time_cost: round2(timeCost),
     time_hours: round2(timeHours),
-    below_floor: num(rateHr) > 0 && num(rateHr) < MARKET_FLOOR_HR,
+    per_pierce: perPierce,
+    per_inch: perInch,
+    min_applied: minApplied,
+    job_minimum: JOB_MINIMUM,
+    below_floor: sellRate > 0 && sellRate < MARKET_FLOOR_HR,
     losing_money: jobProfit < 0,
   };
 }

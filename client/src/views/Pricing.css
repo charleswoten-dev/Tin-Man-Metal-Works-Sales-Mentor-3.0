@@ -91,6 +91,18 @@
   font-family: inherit;
 }
 .pfield-input input:focus { outline: none; border-color: var(--green); }
+.pfield-input select {
+  width: 128px;
+  background: #1a1a1a;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.pfield-input select:focus { outline: none; border-color: var(--green); }
 
 /* ---- result block ---- */
 .result-block {

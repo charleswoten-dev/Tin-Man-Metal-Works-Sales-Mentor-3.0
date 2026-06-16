@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import {
-  computeShopRate, computeQuote, RATE_DEFAULTS, QUOTE_DEFAULTS,
+  computeShopRate, computeQuote, RATE_DEFAULTS, QUOTE_DEFAULTS, THICKNESS_TIERS,
 } from '../lib/pricing.js';
 import './Pricing.css';
 
@@ -270,9 +270,21 @@ export default function Pricing() {
             )}
 
             <Field label="Job name" type="text" placeholder="e.g. Ranch Gate Sign" value={quoteTitle} onChange={(e) => setQuoteTitle(e.target.value)} />
+
+            <div className="pfield">
+              <label>Material thickness<span className="pfield-hint">Thicker steel = higher pierce &amp; cut rates</span></label>
+              <div className="pfield-input">
+                <select value={quote.thickness} onChange={setQ('thickness')}>
+                  {THICKNESS_TIERS.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <Field label="Material cost" hint={`× ${rate.material_markup} markup, + ${rate.scrap_pct}% scrap`} prefix="$" value={quote.material_cost} onChange={setQ('material_cost')} />
-            <Field label="Pierces" hint={`${money(rate.cost_per_pierce)} each`} value={quote.pierces} onChange={setQ('pierces')} />
-            <Field label="Cut length (linear in.)" hint={`${money(rate.cost_per_inch)} / in.`} value={quote.cut_inches} onChange={setQ('cut_inches')} />
+            <Field label="Pierces" hint={`${money(quoteResult.per_pierce)} each at this thickness`} value={quote.pierces} onChange={setQ('pierces')} />
+            <Field label="Cut length (linear in.)" hint={`${money(quoteResult.per_inch)} / in. at this thickness`} value={quote.cut_inches} onChange={setQ('cut_inches')} />
             <Field label="Machine run time (min)" value={quote.run_minutes} onChange={setQ('run_minutes')} />
             <Field label="Design / CAD time (hrs)" hint="Most-forgotten cost" value={quote.cad_hours} onChange={setQ('cad_hours')} />
             <Field label="Setup & handling (hrs)" hint="The hidden killer" value={quote.setup_hours} onChange={setQ('setup_hours')} />
@@ -309,6 +321,14 @@ export default function Pricing() {
                 {quoteResult.losing_money ? 'Loss' : 'Profit'}: {money(quoteResult.job_profit)} ({quoteResult.job_profit_pct}%)
               </div>
             </div>
+
+            {quoteResult.min_applied && (
+              <div className="warn-flag info">
+                <span>🧾</span>
+                <div>The math came to {money(quoteResult.raw_total)}, but your <b>{money(quoteResult.job_minimum)} job minimum</b> applies —
+                  small jobs still cost setup, design, and handling time.</div>
+              </div>
+            )}
 
             {quoteResult.losing_money && (
               <div className="warn-flag">
