@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tin Man — Pricing Module Mockup</title>
+<style>
+  :root{
+    --bg:#1a1a1a; --sidebar:#111; --card:#242424;
+    --green:#00C853; --green-bright:#00E676;
+    --text:#e0e0e0; --text-secondary:#888; --text-muted:#555;
+    --border:#2a2a2a; --radius:12px; --radius-lg:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+
+  /* ---- sidebar ---- */
+  .sidebar{width:240px;background:var(--sidebar);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:18px 12px;flex-shrink:0}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 10px 18px;font-weight:800;font-size:16px;letter-spacing:.3px}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green-bright));
+    display:grid;place-items:center;color:#0a0a0a;font-weight:900}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:var(--text-secondary);
+    text-decoration:none;font-size:14px;font-weight:600}
+  .nav a:hover{background:#1b1b1b;color:var(--text)}
+  .nav a.active{background:rgba(0,200,83,.12);color:var(--green-bright)}
+  .nav a.active .ic{color:var(--green-bright)}
+  .ic{width:18px;text-align:center;font-size:15px;color:var(--text-muted)}
+  .badge-new{margin-left:auto;font-size:9px;font-weight:800;letter-spacing:.5px;color:#0a0a0a;
+    background:var(--green-bright);padding:2px 6px;border-radius:6px}
+  .sb-foot{margin-top:auto;padding:10px;font-size:11px;color:var(--text-muted)}
+
+  /* ---- main ---- */
+  .main{flex:1;overflow-y:auto;padding:28px 34px}
+  .h1{font-size:24px;font-weight:800;margin:0 0 4px}
+  .sub{color:var(--text-secondary);font-size:14px;margin:0 0 24px;max-width:620px;line-height:1.5}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media(max-width:1000px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px}
+  .card h2{font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-secondary);margin:0 0 16px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--border)}
+  .row:last-child{border-bottom:none}
+  .row label{font-size:13.5px;color:var(--text)}
+  .row .hint{display:block;font-size:11px;color:var(--text-muted);margin-top:2px}
+  .inp{width:120px;text-align:right;background:#1a1a1a;border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+  .inp:focus{outline:none;border-color:var(--green)}
+  .pre{color:var(--text-muted);margin-right:-6px}
+
+  .result{margin-top:18px;background:linear-gradient(135deg,rgba(0,200,83,.14),rgba(0,230,118,.05));
+    border:1px solid rgba(0,200,83,.35);border-radius:var(--radius);padding:16px 18px}
+  .result .lbl{font-size:12px;color:var(--text-secondary);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+  .result .big{font-size:34px;font-weight:900;color:var(--green-bright);line-height:1.1;margin:4px 0}
+  .result .note{font-size:12px;color:var(--text-secondary)}
+
+  .break{margin-top:14px}
+  .break .row{padding:7px 0}
+  .break .row span:first-child{color:var(--text-secondary);font-size:13px}
+  .break .row span:last-child{font-weight:700;font-size:13.5px}
+  .total-row span{font-size:16px!important;color:var(--text)!important;font-weight:800!important}
+
+  .flag{margin-top:14px;display:flex;gap:10px;background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.35);
+    border-radius:10px;padding:12px 14px;font-size:13px;color:#ffce7a;line-height:1.45}
+  .flag b{color:#ffd591}
+
+  .pill{display:inline-block;font-size:11px;color:var(--green-bright);background:rgba(0,200,83,.12);
+    border:1px solid rgba(0,200,83,.3);padding:3px 9px;border-radius:20px;margin-bottom:14px;font-weight:700}
+  .ai{margin-top:20px;background:#1c1c1c;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;
+    display:flex;gap:12px;align-items:flex-start}
+  .ai .av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green-bright));
+    flex-shrink:0;display:grid;place-items:center;color:#0a0a0a;font-weight:900;font-size:13px}
+  .ai p{margin:0;font-size:13.5px;line-height:1.5;color:var(--text)}
+  .ai p b{color:var(--green-bright)}
+  .savebar{margin-top:16px;display:flex;gap:10px}
+  .btn{border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-primary{background:var(--green);color:#0a0a0a}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-secondary)}
+  .seg{display:flex;gap:6px;margin-bottom:20px}
+  .seg button{background:#1a1a1a;border:1px solid var(--border);color:var(--text-secondary);padding:8px 16px;
+    border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+  .seg button.on{background:rgba(0,200,83,.12);border-color:rgba(0,200,83,.4);color:var(--green-bright)}
+</style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">T</span> Tin Man</div>
+    <nav class="nav">
+      <a href="#"><span class="ic">💬</span> Chat</a>
+      <a href="#"><span class="ic">📈</span> Progress</a>
+      <a href="#" class="active"><span class="ic">🧮</span> Pricing <span class="badge-new">NEW</span></a>
+      <a href="#"><span class="ic">🔖</span> Saves</a>
+      <a href="#"><span class="ic">📚</span> Niche Library</a>
+      <a href="#"><span class="ic">🏆</span> Win Wall</a>
+      <a href="#"><span class="ic">⚙️</span> Settings</a>
+    </nav>
+    <div class="sb-foot">Charles Woten<br>Tin Man Metal Works</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <span class="pill">YBR · Know Your Numbers</span>
+    <h1 class="h1">Pricing &amp; Quotes</h1>
+    <p class="sub">Stop guessing. Build your true shop rate once, then quote every job from your own real
+      costs — so every price you send actually makes you money.</p>
+
+    <div class="seg">
+      <button class="on">① Build My Shop Rate</button>
+      <button>② Quote a Job</button>
+      <button>📁 Saved Quotes</button>
+    </div>
+
+    <div class="grid">
+
+      <!-- LEFT: Shop Rate setup -->
+      <section class="card">
+        <h2>Build My Shop Rate</h2>
+
+        <div class="row">
+          <label>Pay yourself / hour
+            <span class="hint">Market range: $40–135/hr. Don't lowball your own time.</span></label>
+          <span><span class="pre">$</span><input class="inp" value="55" oninput="calc()" id="wage"></span>
+        </div>
+
+        <div class="row">
+          <label>Machine cost / hour
+            <span class="hint">Payment + consumables + power + gas ÷ billable hrs</span></label>
+          <span><span class="pre">$</span><input class="inp" value="22" oninput="calc()" id="mach"></span>
+        </div>
+
+        <div class="row">
+          <label>Overhead / hour
+            <span class="hint">Rent, insurance, software, phone ÷ billable hrs</span></label>
+          <span><span class="pre">$</span><input class="inp" value="12" oninput="calc()" id="oh"></span>
+        </div>
+
+        <div class="row">
+          <label>Target profit margin
+            <span class="hint">Profit on purpose — not whatever's left over</span></label>
+          <span><input class="inp" value="20" oninput="calc()" id="margin"><span class="pre" style="margin-left:4px">%</span></span>
+        </div>
+
+        <div class="result">
+          <div class="lbl">Your true shop rate</div>
+          <div class="big" id="shopRate">$106 / hr</div>
+          <div class="note" id="rateNote">($89/hr cost + 20% profit). This is what every quote is built on.</div>
+        </div>
+
+        <div class="flag" id="lowFlag" style="display:none">
+          <span>⚠️</span><div>This rate is <b>below the market floor</b> we found in the research.
+            You're probably leaving out consumables wear or undercounting overhead — let's fix the inputs.</div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Quote a job -->
+      <section class="card">
+        <h2>Quote a Job — “Ranch Gate Sign”</h2>
+
+        <div class="row"><label>Material cost <span class="hint">× 1.5 markup (editable)</span></label>
+          <span><span class="pre">$</span><input class="inp" value="40" oninput="calc()" id="mat"></span></div>
+        <div class="row"><label>Pierces <span class="hint">$0.18 each</span></label>
+          <span><input class="inp" value="60" oninput="calc()" id="pierce"></span></div>
+        <div class="row"><label>Cut length (linear in.) <span class="hint">$0.15 / in.</span></label>
+          <span><input class="inp" value="180" oninput="calc()" id="cut"></span></div>
+        <div class="row"><label>Machine run time (min)</label>
+          <span><input class="inp" value="35" oninput="calc()" id="run"></span></div>
+        <div class="row"><label>Design / CAD time (hrs) <span class="hint">most-forgotten cost</span></label>
+          <span><input class="inp" value="1.5" oninput="calc()" id="cad"></span></div>
+        <div class="row"><label>Setup &amp; handling (hrs) <span class="hint">the hidden killer</span></label>
+          <span><input class="inp" value="0.5" oninput="calc()" id="setup"></span></div>
+
+        <div class="break">
+          <div class="row"><span>Material (×1.5)</span><span id="bMat">$60</span></div>
+          <div class="row"><span>Cutting (pierce + length)</span><span id="bCut">$37.80</span></div>
+          <div class="row"><span>Machine + labor time</span><span id="bTime">$0</span></div>
+          <div class="row total-row"><span>Suggested quote</span><span id="bTotal">$0</span></div>
+        </div>
+
+        <div class="ai">
+          <div class="av">T</div>
+          <p id="aiMsg"><b>Tin Man:</b> At this price your profit is <b>$0</b>. Your old gut-quote was
+            around $180 — you'd have lost money. Want me to draft the customer-facing quote?</p>
+        </div>
+
+        <div class="savebar">
+          <button class="btn btn-primary">Save quote to Ranch Gate Signs</button>
+          <button class="btn btn-ghost">Send to Chat mentor</button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+<script>
+  function n(id){return parseFloat(document.getElementById(id).value)||0}
+  function calc(){
+    // shop rate
+    const cost = n('wage')+n('mach')+n('oh');
+    const rate = cost*(1+n('margin')/100);
+    document.getElementById('shopRate').textContent = '$'+rate.toFixed(0)+' / hr';
+    document.getElementById('rateNote').textContent =
+      '($'+cost.toFixed(0)+'/hr cost + '+n('margin')+'% profit). This is what every quote is built on.';
+    document.getElementById('lowFlag').style.display = rate < 35 ? 'flex' : 'none';
+
+    // job
+    const mat = n('mat')*1.5;
+    const cut = n('pierce')*0.18 + n('cut')*0.15;
+    const timeHrs = n('run')/60 + n('cad') + n('setup');
+    const time = timeHrs*rate;
+    const total = mat+cut+time;
+    document.getElementById('bMat').textContent = '$'+mat.toFixed(2);
+    document.getElementById('bCut').textContent = '$'+cut.toFixed(2);
+    document.getElementById('bTime').textContent = '$'+time.toFixed(2);
+    document.getElementById('bTotal').textContent = '$'+total.toFixed(2);
+
+    const profit = total - cost*timeHrs - mat/1.5 - cut; // rough profit vs raw cost
+    const msg = document.getElementById('aiMsg');
+    msg.innerHTML = '<b>Tin Man:</b> This job prices at <b>$'+total.toFixed(0)+'</b>. '+
+      'Your old gut-quote was around $180 — building it actually costs you about $'+
+      (cost*timeHrs + mat/1.5 + cut).toFixed(0)+'. Want me to draft the customer-facing quote?';
+  }
+  calc();
+</script>
+</body>
+</html>

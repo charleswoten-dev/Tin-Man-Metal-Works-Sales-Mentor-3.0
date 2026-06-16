@@ -65,3 +65,7 @@ export const CheckIcon = (p) => (
 export const BookmarkIcon = (p) => (
   <svg {...base} {...p}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
 );
+
+export const PricingIcon = (p) => (
+  <svg {...base} {...p}><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 6h8" /><path d="M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2" /></svg>
+);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, buildProfileBlock } from '../lib/systemPrompt.js';
+import { SYSTEM_PROMPT, buildProfileBlock, buildShopRateBlock } from '../lib/systemPrompt.js';
 
 const router = Router();
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
@@ -8,7 +8,7 @@ const PLACEHOLDER = 'PASTE_YOUR_NEW_ROTATED_KEY_HERE';
 
 router.post('/', async (req, res) => {
   try {
-    const { messages, profile, userApiKey } = req.body || {};
+    const { messages, profile, shopRate, userApiKey } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'A non-empty messages array is required.' });
@@ -28,6 +28,8 @@ router.post('/', async (req, res) => {
     ];
     const profileBlock = buildProfileBlock(profile);
     if (profileBlock) system.push({ type: 'text', text: profileBlock });
+    const shopRateBlock = buildShopRateBlock(shopRate);
+    if (shopRateBlock) system.push({ type: 'text', text: shopRateBlock });
 
     const cleaned = messages
       .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content)

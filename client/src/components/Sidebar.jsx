@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import TinManIcon from './TinManIcon.jsx';
 import {
-  ChatIcon, ProgressIcon, SavesIcon,
+  ChatIcon, ProgressIcon, SavesIcon, PricingIcon,
   LibraryIcon, WinsIcon, SettingsIcon, RefreshIcon, LogoutIcon,
 } from './Icons.jsx';
 import { YBR_STEPS } from '../lib/ybrSteps.js';
@@ -52,6 +52,7 @@ export default function Sidebar({
       <nav className="sidebar-nav">
         <div className="nav-section-label">Main</div>
         <NavItem to="/chat" icon={ChatIcon} label="Chat" />
+        <NavItem to="/pricing" icon={PricingIcon} label="Pricing" />
 
         <NavLink
           to="/progress"

@@ -332,7 +332,92 @@ alter table public.admin_users     enable row level security;
 alter table public.webhook_logs    enable row level security;
 
 -- ============================================================================
+--  PRICING  (Added 2026-06-16)
+--  shop_rate: one row per user (their cost basis behind every quote).
+--  quotes:    saved job estimates, optionally tied to a project.
+--  Both are own-rows-only via RLS, same pattern as projects/project_steps.
+-- ============================================================================
+
+-- 12. SHOP_RATE  (one row per user — user_id is the PK so upserts are 1:1)
+create table if not exists public.shop_rate (
+  user_id               uuid primary key references auth.users(id) on delete cascade,
+  mode                  text not null default 'cost' check (mode in ('cost','income')),
+  -- Mode A: cost build-up
+  wage_hr               numeric,
+  burden_pct            numeric default 30,
+  machine_monthly_cost  numeric,
+  overhead_monthly      numeric,
+  work_hours_week       numeric default 40,
+  billable_pct          numeric default 65,
+  margin_pct            numeric default 32,
+  -- Mode B: income goal
+  target_income_yr      numeric,
+  annual_expenses       numeric,
+  work_weeks_yr         numeric default 50,
+  -- per-user job-calc defaults (editable)
+  material_markup       numeric default 1.5,
+  scrap_pct             numeric default 5,
+  cost_per_pierce       numeric default 0.18,
+  cost_per_inch         numeric default 0.15,
+  -- cached result (computed client-side, stored so the AI + sidebar read it cheaply)
+  computed_rate_hr      numeric,
+  computed_breakeven_hr numeric,
+  updated_at            timestamptz not null default now()
+);
+
+-- 13. QUOTES  (saved job estimates; optionally linked to a project)
+create table if not exists public.quotes (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  project_id      uuid references public.projects(id) on delete set null,
+  title           text not null,
+  -- inputs (stored so a quote can be re-opened / cloned)
+  material_cost   numeric,
+  pierces         integer,
+  cut_inches      numeric,
+  run_minutes     numeric,
+  cad_hours       numeric,
+  setup_hours     numeric,
+  quantity        integer default 1,
+  -- snapshot of the rate used (so editing the shop rate never rewrites old quotes)
+  rate_hr_used    numeric,
+  -- computed outputs
+  unit_price      numeric,
+  total_price     numeric,
+  job_profit      numeric,
+  status          text not null default 'draft'
+                  check (status in ('draft','sent','won','lost')),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists quotes_user_idx on public.quotes (user_id, created_at desc);
+create index if not exists quotes_project_idx on public.quotes (project_id);
+
+-- own rows only ---------------------------------------------------------------
+alter table public.shop_rate enable row level security;
+alter table public.quotes    enable row level security;
+
+drop policy if exists "shop_rate_all_own" on public.shop_rate;
+create policy "shop_rate_all_own" on public.shop_rate
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "quotes_all_own" on public.quotes;
+create policy "quotes_all_own" on public.quotes
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- keep updated_at fresh
+drop trigger if exists shop_rate_set_updated_at on public.shop_rate;
+create trigger shop_rate_set_updated_at
+  before update on public.shop_rate
+  for each row execute function public.set_updated_at();
+
+drop trigger if exists quotes_set_updated_at on public.quotes;
+create trigger quotes_set_updated_at
+  before update on public.quotes
+  for each row execute function public.set_updated_at();
+
+-- ============================================================================
 --  Done. Tables: profiles, messages, saves, progress, wins,
---                projects, project_steps,
+--                projects, project_steps, shop_rate, quotes,
 --                licenses, approved_buyers, admin_users, webhook_logs.
 -- ============================================================================

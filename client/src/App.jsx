@@ -6,6 +6,7 @@ import Register from './views/Register.jsx';
 import Admin from './views/Admin.jsx';
 import TinManIcon from './components/TinManIcon.jsx';
 import Chat from './views/Chat.jsx';
+import Pricing from './views/Pricing.jsx';
 import Progress from './views/Progress.jsx';
 import Saves from './views/Saves.jsx';
 import NicheLibrary from './views/NicheLibrary.jsx';
@@ -34,6 +35,7 @@ function Root() {
           <Route element={<Layout />}>
             <Route index element={<Navigate to="/chat" replace />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/saves" element={<Saves />} />
             <Route path="/niche-library" element={<NicheLibrary />} />

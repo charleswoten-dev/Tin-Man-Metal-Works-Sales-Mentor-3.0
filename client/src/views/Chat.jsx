@@ -144,6 +144,9 @@ export default function Chat() {
   // Transient "Saved to <project> ✓" confirmation shown after the walkthrough
   // auto-saves a completed step into the active project.
   const [savedToast, setSavedToast] = useState(null);
+  // The owner's saved shop rate (from the Pricing page), sent with each chat
+  // request so the mentor can reference their real numbers and catch undercharging.
+  const shopRateRef = useRef(null);
   const {
     recognitionSupported,
     speechSupported,
@@ -159,6 +162,17 @@ export default function Chat() {
   useEffect(() => {
     if (profile) setVoiceOut(Boolean(profile.voice_enabled));
   }, [profile?.voice_enabled]);
+
+  // Load the owner's saved shop rate once so the mentor can coach on real numbers.
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('shop_rate')
+      .select('computed_rate_hr, computed_breakeven_hr')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => { shopRateRef.current = data || null; });
+  }, [user?.id]);
 
   // Seed the active walkthrough project from the saved profile, and fetch its
   // name so the save confirmation can show it.
@@ -263,6 +277,7 @@ export default function Chat() {
       const { reply } = await apiPost('/chat', {
         messages: history,
         profile: profileForApi(),
+        shopRate: shopRateRef.current,
         userApiKey: profile?.anthropic_api_key || null,
       });
       const { clean, stepKeys, projectName, summaries } = extractStepMarkers(reply);
