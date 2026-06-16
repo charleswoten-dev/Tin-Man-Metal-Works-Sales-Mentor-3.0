@@ -10,6 +10,12 @@ import './Pricing.css';
 const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const money0 = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
 
+// Cents-rate fields (cut $/in, pierce $) display with 2 decimals so 0.2 reads
+// as "0.20". Blank stays blank; non-numeric is left untouched (mid-typing).
+const fmt2 = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v).toFixed(2));
+const fmtTiers = (rows) =>
+  (rows || []).map((t) => ({ ...t, cost_per_inch: fmt2(t.cost_per_inch), cost_per_pierce: fmt2(t.cost_per_pierce) }));
+
 // Scalar columns we persist to shop_rate (thickness_rates handled separately as jsonb).
 const RATE_COLS = [
   'mode', 'wage_hr', 'burden_pct', 'machine_monthly_cost', 'overhead_monthly',
@@ -57,14 +63,14 @@ export default function Pricing() {
       if (cancelled) return;
       if (sr) {
         // merge saved values over defaults (so new columns still have a default)
-        const merged = { ...RATE_DEFAULTS, thickness_rates: defaultThicknessRates() };
+        const merged = { ...RATE_DEFAULTS, thickness_rates: fmtTiers(defaultThicknessRates()) };
         for (const k of RATE_COLS) if (sr[k] !== null && sr[k] !== undefined) merged[k] = sr[k];
         if (Array.isArray(sr.thickness_rates) && sr.thickness_rates.length) {
-          merged.thickness_rates = sr.thickness_rates.map((t) => ({ ...t }));
+          merged.thickness_rates = fmtTiers(sr.thickness_rates);
         }
         setRate(merged);
       } else {
-        setRate({ ...RATE_DEFAULTS, thickness_rates: defaultThicknessRates() });
+        setRate({ ...RATE_DEFAULTS, thickness_rates: fmtTiers(defaultThicknessRates()) });
       }
       setProjects(pj || []);
       loadQuotes();
@@ -94,6 +100,13 @@ export default function Pricing() {
       thickness_rates: (r.thickness_rates || []).map((t, idx) => (idx === i ? { ...t, [field]: v } : t)),
     }));
     setRateSaved(false);
+  };
+  // re-format a cents cell to 2 decimals when the user leaves the field
+  const blurTier = (i, field) => () => {
+    setRate((r) => ({
+      ...r,
+      thickness_rates: (r.thickness_rates || []).map((t, idx) => (idx === i ? { ...t, [field]: fmt2(t[field]) } : t)),
+    }));
   };
   const tiers = rate.thickness_rates || [];
 
@@ -307,8 +320,8 @@ export default function Pricing() {
             {tiers.map((t, i) => (
               <div className="tt-row" key={t.value}>
                 <span className="tt-label">{t.label}</span>
-                <input type="number" step="any" inputMode="decimal" value={t.cost_per_inch ?? ''} onChange={setTier(i, 'cost_per_inch')} />
-                <input type="number" step="any" inputMode="decimal" value={t.cost_per_pierce ?? ''} onChange={setTier(i, 'cost_per_pierce')} />
+                <input type="number" step="any" inputMode="decimal" value={t.cost_per_inch ?? ''} onChange={setTier(i, 'cost_per_inch')} onBlur={blurTier(i, 'cost_per_inch')} />
+                <input type="number" step="any" inputMode="decimal" value={t.cost_per_pierce ?? ''} onChange={setTier(i, 'cost_per_pierce')} onBlur={blurTier(i, 'cost_per_pierce')} />
                 <input type="number" step="any" inputMode="decimal" value={t.sqft_price ?? ''} onChange={setTier(i, 'sqft_price')} />
               </div>
             ))}
