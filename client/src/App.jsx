@@ -26,7 +26,7 @@ function Root() {
   if (loading) return <Splash />;
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         {/* Admin panel is independent of the user session. */}
         <Route path="/admin" element={<Admin />} />
