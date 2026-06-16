@@ -52,7 +52,6 @@ export default function Sidebar({
       <nav className="sidebar-nav">
         <div className="nav-section-label">Main</div>
         <NavItem to="/chat" icon={ChatIcon} label="Chat" />
-        <NavItem to="/pricing" icon={PricingIcon} label="Pricing" />
 
         <NavLink
           to="/progress"
@@ -101,6 +100,7 @@ export default function Sidebar({
         <div className="nav-section-label">Resources</div>
         <NavItem to="/niche-library" icon={LibraryIcon} label="Niche Library" />
         <NavItem to="/win-wall" icon={WinsIcon} label="Win Wall" />
+        <NavItem to="/pricing" icon={PricingIcon} label="Pricing" />
         <NavItem to="/settings" icon={SettingsIcon} label="Settings" />
       </nav>
 
