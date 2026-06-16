@@ -354,11 +354,17 @@ create table if not exists public.shop_rate (
   target_income_yr      numeric,
   annual_expenses       numeric,
   work_weeks_yr         numeric default 50,
-  -- per-user job-calc defaults (editable)
-  material_markup       numeric default 1.5,
-  scrap_pct             numeric default 5,
-  cost_per_pierce       numeric default 0.18,
-  cost_per_inch         numeric default 0.15,
+  -- per-user job-calc defaults (editable on the Job Rates panel)
+  material_markup       numeric default 2,
+  scrap_pct             numeric default 7,
+  job_minimum           numeric default 125,
+  default_rate_hr       numeric default 125,
+  finishing_rate_sqft   numeric default 8,
+  -- per-thickness cut/pierce + sq-ft rate table: [{value,label,cost_per_inch,cost_per_pierce,sqft_price}]
+  thickness_rates       jsonb,
+  -- legacy fallback cut rates (superseded by thickness_rates)
+  cost_per_pierce       numeric default 0.15,
+  cost_per_inch         numeric default 0.20,
   -- cached result (computed client-side, stored so the AI + sidebar read it cheaply)
   computed_rate_hr      numeric,
   computed_breakeven_hr numeric,
@@ -372,6 +378,11 @@ create table if not exists public.quotes (
   project_id      uuid references public.projects(id) on delete set null,
   title           text not null,
   -- inputs (stored so a quote can be re-opened / cloned)
+  method          text default 'detailed',   -- 'detailed' | 'sqft'
+  thickness       text,
+  square_feet     numeric,
+  finishing       boolean default false,
+  finish_sqft     numeric,
   material_cost   numeric,
   pierces         integer,
   cut_inches      numeric,

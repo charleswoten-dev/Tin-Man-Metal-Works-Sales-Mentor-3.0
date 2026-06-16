@@ -164,6 +164,28 @@
   border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; min-width: 160px;
 }
 
+/* ---- job rates / baselines panel ---- */
+.pcard-rates { margin-top: 20px; }
+.rates-intro { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin: 0 0 16px; max-width: 680px; }
+.rates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+@media (max-width: 640px) { .rates-grid { grid-template-columns: 1fr; } }
+.rates-subhead { font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--text-secondary); margin: 22px 0 12px; }
+
+.thickness-table { display: flex; flex-direction: column; gap: 6px; }
+.tt-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: center; }
+.tt-head { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-muted); padding-bottom: 2px; }
+.tt-head span:first-child { padding-left: 2px; }
+.tt-label { font-size: 14px; font-weight: 700; color: var(--text); }
+.tt-row input {
+  background: #1a1a1a; border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; text-align: right; width: 100%;
+}
+.tt-row input:focus { outline: none; border-color: var(--green); }
+
+/* ---- finishing checkbox row ---- */
+.check-row { display: flex; align-items: center; gap: 8px; }
+.check-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
+
 /* ---- education card ---- */
 .pcard-edu p { font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 12px; }
 .pcard-edu p:last-child { margin-bottom: 0; }

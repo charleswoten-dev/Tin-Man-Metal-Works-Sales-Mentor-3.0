@@ -3,18 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import {
-  computeShopRate, computeQuote, RATE_DEFAULTS, QUOTE_DEFAULTS, THICKNESS_TIERS,
+  computeShopRate, computeQuote, RATE_DEFAULTS, QUOTE_DEFAULTS, defaultThicknessRates,
 } from '../lib/pricing.js';
 import './Pricing.css';
 
 const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const money0 = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
 
-// Columns we persist to shop_rate (everything except the cached computed_* + updated_at).
+// Scalar columns we persist to shop_rate (thickness_rates handled separately as jsonb).
 const RATE_COLS = [
   'mode', 'wage_hr', 'burden_pct', 'machine_monthly_cost', 'overhead_monthly',
   'work_hours_week', 'billable_pct', 'margin_pct', 'target_income_yr',
   'annual_expenses', 'work_weeks_yr', 'material_markup', 'scrap_pct',
+  'job_minimum', 'default_rate_hr', 'finishing_rate_sqft',
   'cost_per_pierce', 'cost_per_inch',
 ];
 
@@ -56,9 +57,14 @@ export default function Pricing() {
       if (cancelled) return;
       if (sr) {
         // merge saved values over defaults (so new columns still have a default)
-        const merged = { ...RATE_DEFAULTS };
+        const merged = { ...RATE_DEFAULTS, thickness_rates: defaultThicknessRates() };
         for (const k of RATE_COLS) if (sr[k] !== null && sr[k] !== undefined) merged[k] = sr[k];
+        if (Array.isArray(sr.thickness_rates) && sr.thickness_rates.length) {
+          merged.thickness_rates = sr.thickness_rates.map((t) => ({ ...t }));
+        }
         setRate(merged);
+      } else {
+        setRate({ ...RATE_DEFAULTS, thickness_rates: defaultThicknessRates() });
       }
       setProjects(pj || []);
       loadQuotes();
@@ -79,6 +85,17 @@ export default function Pricing() {
   // ---- field helpers --------------------------------------------------------
   const setR = (k) => (e) => { setRate((r) => ({ ...r, [k]: e.target.value })); setRateSaved(false); };
   const setQ = (k) => (e) => setQuote((q) => ({ ...q, [k]: e.target.value }));
+  const setQBool = (k) => (e) => setQuote((q) => ({ ...q, [k]: e.target.checked }));
+  // edit one cell of the per-thickness rate table
+  const setTier = (i, field) => (e) => {
+    const v = e.target.value;
+    setRate((r) => ({
+      ...r,
+      thickness_rates: (r.thickness_rates || []).map((t, idx) => (idx === i ? { ...t, [field]: v } : t)),
+    }));
+    setRateSaved(false);
+  };
+  const tiers = rate.thickness_rates || [];
 
   // ---- save shop rate -------------------------------------------------------
   const saveRate = async () => {
@@ -86,6 +103,13 @@ export default function Pricing() {
     const row = { user_id: user.id, computed_rate_hr: rateResult.rate_hr, computed_breakeven_hr: rateResult.breakeven_hr };
     for (const k of RATE_COLS) row[k] = rate[k] === '' || rate[k] === undefined ? null : Number.isNaN(Number(rate[k])) ? rate[k] : (k === 'mode' ? rate[k] : Number(rate[k]));
     row.mode = rate.mode === 'income' ? 'income' : 'cost';
+    row.thickness_rates = (rate.thickness_rates || []).map((t) => ({
+      value: String(t.value),
+      label: t.label,
+      cost_per_inch: Number(t.cost_per_inch) || 0,
+      cost_per_pierce: Number(t.cost_per_pierce) || 0,
+      sqft_price: Number(t.sqft_price) || 0,
+    }));
     const { error } = await supabase.from('shop_rate').upsert(row, { onConflict: 'user_id' });
     if (!error) {
       setRateSaved(true);
@@ -103,6 +127,11 @@ export default function Pricing() {
       user_id: user.id,
       project_id: quoteProjectId || null,
       title,
+      method: quote.method === 'sqft' ? 'sqft' : 'detailed',
+      thickness: String(quote.thickness),
+      square_feet: Number(quote.square_feet) || 0,
+      finishing: Boolean(quote.finishing),
+      finish_sqft: Number(quote.finish_sqft) || 0,
       material_cost: Number(quote.material_cost) || 0,
       pierces: parseInt(quote.pierces, 10) || 0,
       cut_inches: Number(quote.cut_inches) || 0,
@@ -179,6 +208,7 @@ export default function Pricing() {
 
       {/* ============================ TAB 1: SHOP RATE ====================== */}
       {loaded && tab === 'rate' && (
+        <>
         <div className="pricing-grid">
           <section className="pcard">
             <div className="pcard-head">
@@ -253,6 +283,42 @@ export default function Pricing() {
             <p>Set this once. Every quote on the next tab is built straight from it.</p>
           </aside>
         </div>
+
+        {/* ---- editable job-pricing rates (baselines; adjust for your area) ---- */}
+        <section className="pcard pcard-rates">
+          <div className="pcard-head">
+            <h2>Job Rates &amp; Baselines</h2>
+          </div>
+          <p className="rates-intro">These are starting points — material market, location, and competition shift them. Tune them to your shop, then every quote uses your numbers.</p>
+
+          <div className="rates-grid">
+            <Field label="Material markup" hint="Multiplier on material cost" suffix="×" value={rate.material_markup} onChange={setR('material_markup')} />
+            <Field label="Scrap allowance" suffix="%" value={rate.scrap_pct} onChange={setR('scrap_pct')} />
+            <Field label="Default shop rate" hint="Used until you build your own" prefix="$" value={rate.default_rate_hr} onChange={setR('default_rate_hr')} />
+            <Field label="Job minimum" hint="No job goes out below this" prefix="$" value={rate.job_minimum} onChange={setR('job_minimum')} />
+            <Field label="Finishing rate" hint="Paint / powdercoat" prefix="$" suffix="/ sq ft" value={rate.finishing_rate_sqft} onChange={setR('finishing_rate_sqft')} />
+          </div>
+
+          <h3 className="rates-subhead">Cut &amp; pierce + sq-ft price by thickness</h3>
+          <div className="thickness-table">
+            <div className="tt-row tt-head">
+              <span>Thickness</span><span>Cut $/in</span><span>Pierce $</span><span>$ / sq ft</span>
+            </div>
+            {tiers.map((t, i) => (
+              <div className="tt-row" key={t.value}>
+                <span className="tt-label">{t.label}</span>
+                <input type="number" step="any" inputMode="decimal" value={t.cost_per_inch ?? ''} onChange={setTier(i, 'cost_per_inch')} />
+                <input type="number" step="any" inputMode="decimal" value={t.cost_per_pierce ?? ''} onChange={setTier(i, 'cost_per_pierce')} />
+                <input type="number" step="any" inputMode="decimal" value={t.sqft_price ?? ''} onChange={setTier(i, 'sqft_price')} />
+              </div>
+            ))}
+          </div>
+
+          <div className="save-bar">
+            <button className="btn-primary" onClick={saveRate}>{rateSaved ? '✓ Saved' : 'Save my rates'}</button>
+          </div>
+        </section>
+        </>
       )}
 
       {/* ============================ TAB 2: QUOTE ========================== */}
@@ -271,23 +337,50 @@ export default function Pricing() {
 
             <Field label="Job name" type="text" placeholder="e.g. Ranch Gate Sign" value={quoteTitle} onChange={(e) => setQuoteTitle(e.target.value)} />
 
+            <div className="mode-toggle">
+              <button className={quote.method !== 'sqft' ? 'on' : ''} onClick={() => setQ('method')({ target: { value: 'detailed' } })}>Detailed</button>
+              <button className={quote.method === 'sqft' ? 'on' : ''} onClick={() => setQ('method')({ target: { value: 'sqft' } })}>By square foot</button>
+            </div>
+
             <div className="pfield">
-              <label>Material thickness<span className="pfield-hint">Thicker steel = higher pierce &amp; cut rates</span></label>
+              <label>Material thickness<span className="pfield-hint">{quote.method === 'sqft' ? 'Sets the $/sq ft for signage' : 'Thicker steel = higher pierce & cut rates'}</span></label>
               <div className="pfield-input">
                 <select value={quote.thickness} onChange={setQ('thickness')}>
-                  {THICKNESS_TIERS.map((t) => (
+                  {tiers.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <Field label="Material cost" hint={`× ${rate.material_markup} markup, + ${rate.scrap_pct}% scrap`} prefix="$" value={quote.material_cost} onChange={setQ('material_cost')} />
-            <Field label="Pierces" hint={`${money(quoteResult.per_pierce)} each at this thickness`} value={quote.pierces} onChange={setQ('pierces')} />
-            <Field label="Cut length (linear in.)" hint={`${money(quoteResult.per_inch)} / in. at this thickness`} value={quote.cut_inches} onChange={setQ('cut_inches')} />
-            <Field label="Machine run time (min)" value={quote.run_minutes} onChange={setQ('run_minutes')} />
-            <Field label="Design / CAD time (hrs)" hint="Most-forgotten cost" value={quote.cad_hours} onChange={setQ('cad_hours')} />
-            <Field label="Setup & handling (hrs)" hint="The hidden killer" value={quote.setup_hours} onChange={setQ('setup_hours')} />
+            {quote.method === 'sqft' ? (
+              <>
+                <Field label="Square feet" hint={`${money(quoteResult.sqft_price)} / sq ft at this thickness`} value={quote.square_feet} onChange={setQ('square_feet')} />
+              </>
+            ) : (
+              <>
+                <Field label="Material cost" hint={`× ${rate.material_markup} markup, + ${rate.scrap_pct}% scrap`} prefix="$" value={quote.material_cost} onChange={setQ('material_cost')} />
+                <Field label="Pierces" hint={`${money(quoteResult.per_pierce)} each at this thickness`} value={quote.pierces} onChange={setQ('pierces')} />
+                <Field label="Cut length (linear in.)" hint={`${money(quoteResult.per_inch)} / in. at this thickness`} value={quote.cut_inches} onChange={setQ('cut_inches')} />
+                <Field label="Machine run time (min)" value={quote.run_minutes} onChange={setQ('run_minutes')} />
+                <Field label="Design / CAD time (hrs)" hint="Most-forgotten cost" value={quote.cad_hours} onChange={setQ('cad_hours')} />
+                <Field label="Setup & handling (hrs)" hint="The hidden killer" value={quote.setup_hours} onChange={setQ('setup_hours')} />
+              </>
+            )}
+
+            <div className="pfield">
+              <label>
+                <span className="check-row"><input type="checkbox" checked={!!quote.finishing} onChange={setQBool('finishing')} /> Paint / powdercoat</span>
+                <span className="pfield-hint">{money(rate.finishing_rate_sqft)} / sq ft finishing</span>
+              </label>
+              {quote.finishing && quote.method !== 'sqft' && (
+                <div className="pfield-input">
+                  <input type="number" step="any" inputMode="decimal" value={quote.finish_sqft ?? ''} onChange={setQ('finish_sqft')} placeholder="sq ft" />
+                  <span className="affix">sq ft</span>
+                </div>
+              )}
+            </div>
+
             <Field label="Quantity" value={quote.quantity} onChange={setQ('quantity')} />
 
             <label className="project-select">
@@ -308,18 +401,31 @@ export default function Pricing() {
           <aside className="pcard pcard-result">
             <h2>The Numbers</h2>
             <div className="breakdown">
-              <Row k={`Material (×${rate.material_markup}, +${rate.scrap_pct}% scrap)`} v={money(quoteResult.material_billed)} />
-              <Row k="Cutting (pierce + length)" v={money(quoteResult.cut_cost)} />
-              <Row k={`Time — ${quoteResult.time_hours} hr × ${money(rateResult.rate_hr)}`} v={money(quoteResult.time_cost)} />
+              {quote.method === 'sqft' ? (
+                <Row k={`Signage — ${quote.square_feet || 0} sq ft × ${money(quoteResult.sqft_price)}`} v={money(quoteResult.base_price)} />
+              ) : (
+                <>
+                  <Row k={`Material (×${rate.material_markup}, +${rate.scrap_pct}% scrap)`} v={money(quoteResult.material_billed)} />
+                  <Row k="Cutting (pierce + length)" v={money(quoteResult.cut_cost)} />
+                  <Row k={`Time — ${quoteResult.time_hours} hr × ${money(rateResult.rate_hr)}`} v={money(quoteResult.time_cost)} />
+                </>
+              )}
+              {quoteResult.finish_cost > 0 && (
+                <Row k={`Finishing (paint / powder)`} v={money(quoteResult.finish_cost)} />
+              )}
               <Row k="Price per part" v={money(quoteResult.unit_price)} strong />
             </div>
 
             <div className="result-block tight">
               <div className="result-lbl">Total quote ({quote.quantity || 1} pc)</div>
               <div className="result-big">{money(quoteResult.total_price)}</div>
-              <div className={'profit-line' + (quoteResult.losing_money ? ' loss' : '')}>
-                {quoteResult.losing_money ? 'Loss' : 'Profit'}: {money(quoteResult.job_profit)} ({quoteResult.job_profit_pct}%)
-              </div>
+              {quoteResult.profit_known ? (
+                <div className={'profit-line' + (quoteResult.losing_money ? ' loss' : '')}>
+                  {quoteResult.losing_money ? 'Loss' : 'Profit'}: {money(quoteResult.job_profit)} ({quoteResult.job_profit_pct}%)
+                </div>
+              ) : (
+                <div className="result-note">All-in square-foot price. Set your $/sq ft to already include your margin.</div>
+              )}
             </div>
 
             {quoteResult.min_applied && (

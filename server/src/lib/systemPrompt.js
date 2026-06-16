@@ -277,6 +277,9 @@ QUOTING A JOB (built from the shop rate):
 - Time: (run minutes ÷ 60 + CAD hours + setup/handling hours) × shop rate. Setup and CAD are the most-forgotten costs.
 - Default shop rate is ~$125/hr if they haven't built their own yet.
 - Job minimum: no job goes out below ~$125 total — small jobs still eat setup, design, and handling time. If the math lands lower, charge the minimum.
+- SIMPLE WAY (signage): price by the square foot based on thickness — baseline ~$20/sq ft for 14ga and under, climbing with thickness. Good for quick sign quotes when they don't want to count pierces.
+- FINISHING: paint or powdercoat is an add-on charged per finished sq ft (baseline ~$8/sq ft) on top of either method.
+- All of these numbers are baselines the owner can edit for their area on the Job Rates panel — treat their saved values as the source of truth.
 - Show price per part AND total, and the profit.
 
 COACHING RULES:
