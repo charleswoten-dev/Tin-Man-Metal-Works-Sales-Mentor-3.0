@@ -1,0 +1,112 @@
+.niche-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.niche-search-wrap {
+  flex-shrink: 0;
+  padding: 4px 26px 14px;
+  max-width: 760px;
+  width: 100%;
+}
+.niche-search {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.niche-search:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.12); }
+.niche-search::placeholder { color: var(--text-muted); }
+
+.niche-body { flex: 1; overflow-y: auto; padding: 4px 26px 28px; }
+.niche-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  max-width: 1100px;
+  align-items: start;
+}
+.niche-empty { color: var(--text-secondary); padding: 30px 4px; }
+
+.niche-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.niche-card.open { border-color: rgba(0, 230, 118, 0.3); }
+
+.niche-card-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.niche-emoji { font-size: 24px; flex-shrink: 0; }
+.niche-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.niche-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.niche-tagline { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.niche-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.niche-chevron.up { transform: rotate(180deg); }
+
+.niche-detail {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+  padding-top: 14px;
+}
+.niche-field { display: flex; flex-direction: column; gap: 6px; }
+.niche-field p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.niche-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.niche-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.niche-chip {
+  font-size: 12.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.niche-coach-btn {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--green);
+  background: rgba(0, 200, 83, 0.12);
+  color: var(--green-bright);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.niche-coach-btn:hover { background: rgba(0, 200, 83, 0.22); }

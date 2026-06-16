@@ -1,0 +1,175 @@
+.onb-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(4, 8, 6, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.onb-card {
+  width: 460px;
+  max-width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 26px 26px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Progress bar */
+.onb-progress {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.onb-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), var(--green-bright));
+  transition: width 0.25s ease;
+}
+
+/* Centered intro / done screens */
+.onb-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 8px 4px;
+}
+.onb-title { margin: 4px 0 0; font-size: 21px; font-weight: 700; color: var(--text); }
+.onb-lede { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+
+/* Question steps */
+.onb-step { display: flex; flex-direction: column; gap: 12px; }
+.onb-step-count {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.onb-q { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.35; color: var(--text); }
+
+.onb-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.onb-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.12); }
+.onb-input::placeholder { color: var(--text-muted); }
+.onb-textarea { resize: none; line-height: 1.5; }
+
+/* Choice chips */
+.onb-choices { display: flex; flex-direction: column; gap: 8px; }
+.onb-choice {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.onb-choice:hover { border-color: var(--text-muted); }
+.onb-choice.selected {
+  border-color: var(--green);
+  background: rgba(0, 200, 83, 0.12);
+  color: var(--green-bright);
+  font-weight: 600;
+}
+
+/* Niche grid */
+.onb-niches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.onb-niche {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.onb-niche:hover { border-color: var(--text-muted); }
+.onb-niche.selected {
+  border-color: var(--green);
+  background: rgba(0, 200, 83, 0.12);
+  color: var(--green-bright);
+}
+.onb-niche.unsure { grid-column: 1 / -1; }
+.onb-niche-emoji { font-size: 16px; flex-shrink: 0; }
+
+/* Buttons */
+.onb-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.onb-btn.lg { padding: 12px 26px; margin-top: 6px; }
+.onb-btn.primary { border: none; background: var(--green); color: #04210f; font-weight: 700; }
+.onb-btn.primary:hover:not(:disabled) { background: var(--green-bright); }
+.onb-btn.primary:disabled { opacity: 0.55; cursor: default; }
+.onb-btn.ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+.onb-btn.ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+.onb-skip {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.onb-skip:hover { color: var(--text-secondary); }
+
+.onb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.onb-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(229, 57, 53, 0.12);
+  border: 1px solid rgba(229, 57, 53, 0.35);
+  color: #ff8a80;
+  font-size: 13px;
+}

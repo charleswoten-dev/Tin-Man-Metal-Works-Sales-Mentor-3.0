@@ -1,0 +1,17 @@
+{
+  "name": "tin-man-sales-mentor",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Tin Man Metal Works Sales Mentor 3.0 — AI coaching PWA for CNC plasma & metal fab business owners",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c green,cyan \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

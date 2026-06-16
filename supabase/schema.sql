@@ -1,0 +1,338 @@
+-- ============================================================================
+--  Tin Man Metal Works Sales Mentor 3.0 — Database schema
+--  Run this ONCE in the Supabase dashboard → SQL Editor → New query → Run.
+--  Safe to re-run: uses "if not exists" / "or replace" / "drop ... if exists".
+-- ============================================================================
+
+-- Needed for gen_random_uuid()
+create extension if not exists pgcrypto;
+
+-- ----------------------------------------------------------------------------
+-- 1. PROFILES  (one row per user; holds onboarding answers + app flags)
+--    Linked 1:1 to Supabase auth.users.
+-- ----------------------------------------------------------------------------
+create table if not exists public.profiles (
+  id                  uuid primary key references auth.users(id) on delete cascade,
+  email               text,
+  name                text,
+
+  -- onboarding question answers
+  plasma_work         text,   -- "what kind of plasma work do you do"
+  time_in_business    text,   -- "how long have you been in business"
+  work_status         text,   -- "full time or day job"
+  monthly_revenue     text,   -- "current monthly revenue"
+  best_products       text,   -- "best selling products"
+  best_customers      text,   -- "best customers"
+  biggest_struggle    text,   -- "biggest struggle"
+  niche               text,   -- selected niche after niche education
+
+  -- app flags / settings
+  tour_completed       boolean not null default false,
+  onboarding_completed boolean not null default false,
+  voice_enabled        boolean not null default false,
+
+  -- API-key handoff (days 1-90 use Charles's key; after day 90 their own)
+  anthropic_api_key    text,
+  notified_day_80      boolean not null default false,
+  notified_day_87      boolean not null default false,
+  seen_api_transition  boolean not null default false,
+
+  created_at           timestamptz not null default now(),  -- basis for day-count
+  updated_at           timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- 2. MESSAGES  (full chat history; "Start Fresh" deletes a user's rows)
+-- ----------------------------------------------------------------------------
+create table if not exists public.messages (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  role        text not null check (role in ('user', 'assistant')),
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists messages_user_created_idx
+  on public.messages (user_id, created_at);
+
+-- ----------------------------------------------------------------------------
+-- 3. SAVES  (My Saves — saved bot messages, organized by type)
+-- ----------------------------------------------------------------------------
+create table if not exists public.saves (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  content     text not null,
+  type        text not null default 'other'
+              check (type in ('ad copy','email','guarantee','product title','funnel','other')),
+  created_at  timestamptz not null default now()
+);
+create index if not exists saves_user_idx on public.saves (user_id, created_at);
+
+-- ----------------------------------------------------------------------------
+-- 4. PROGRESS  (8-step foundation checklist; one row per completed/known step)
+--    step_key is one of: profile_setup, niche_chosen, dream_buyer, offer_built,
+--    guarantee_written, first_fb_ad, email_sequence, funnel_mapped
+-- ----------------------------------------------------------------------------
+create table if not exists public.progress (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  step_key      text not null,
+  completed     boolean not null default false,
+  completed_at  timestamptz,
+  unique (user_id, step_key)
+);
+
+-- ----------------------------------------------------------------------------
+-- 5. WINS  (Win Wall — community wall: everyone reads, you post/delete your own)
+-- ----------------------------------------------------------------------------
+create table if not exists public.wins (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists wins_created_idx on public.wins (created_at desc);
+
+-- ============================================================================
+--  ROW LEVEL SECURITY
+--  RLS is OFF by default in Postgres -> turning it on means "deny all" until a
+--  policy explicitly allows. Each policy below scopes access to auth.uid().
+-- ============================================================================
+alter table public.profiles enable row level security;
+alter table public.messages enable row level security;
+alter table public.saves    enable row level security;
+alter table public.progress enable row level security;
+alter table public.wins     enable row level security;
+
+-- profiles: a user sees/edits only their own row -----------------------------
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own" on public.profiles
+  for select using (auth.uid() = id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own" on public.profiles
+  for insert with check (auth.uid() = id);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own" on public.profiles
+  for update using (auth.uid() = id) with check (auth.uid() = id);
+
+-- messages: own rows only ----------------------------------------------------
+drop policy if exists "messages_all_own" on public.messages;
+create policy "messages_all_own" on public.messages
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- saves: own rows only -------------------------------------------------------
+drop policy if exists "saves_all_own" on public.saves;
+create policy "saves_all_own" on public.saves
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- progress: own rows only ----------------------------------------------------
+drop policy if exists "progress_all_own" on public.progress;
+create policy "progress_all_own" on public.progress
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- wins: COMMUNITY WALL -> any signed-in user can read all wins,
+--       but can only insert/update/delete their own.
+drop policy if exists "wins_select_all" on public.wins;
+create policy "wins_select_all" on public.wins
+  for select using (auth.role() = 'authenticated');
+
+drop policy if exists "wins_insert_own" on public.wins;
+create policy "wins_insert_own" on public.wins
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "wins_update_own" on public.wins;
+create policy "wins_update_own" on public.wins
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "wins_delete_own" on public.wins;
+create policy "wins_delete_own" on public.wins
+  for delete using (auth.uid() = user_id);
+
+-- ============================================================================
+--  TRIGGERS
+-- ============================================================================
+
+-- Auto-create a profile row whenever a new auth user signs up.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email)
+  values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- Keep profiles.updated_at fresh on every update.
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at
+  before update on public.profiles
+  for each row execute function public.set_updated_at();
+
+-- ============================================================================
+--  LICENSE-KEY PROTECTION SYSTEM
+--  Added 2026-06-15. These tables are touched ONLY by the backend using the
+--  Supabase service-role key. RLS is enabled with NO policies, so the public
+--  anon/authenticated client (the browser) can never read or write them — this
+--  is what guarantees license keys are never exposed in frontend JavaScript.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 6. LICENSES  (one row per generated key; format TM3-XXXX-XXXX-XXXX)
+-- ----------------------------------------------------------------------------
+create table if not exists public.licenses (
+  id          uuid primary key default gen_random_uuid(),
+  key         text unique not null,                 -- TM3-XXXX-XXXX-XXXX
+  email       text,                                 -- purchase email this key is for
+  used        boolean not null default false,
+  used_at     timestamptz,
+  revoked     boolean not null default false,
+  revoked_at  timestamptz,
+  order_id    text,                                 -- ClickFunnels order reference
+  created_at  timestamptz not null default now()
+);
+create index if not exists licenses_email_idx on public.licenses (lower(email));
+create index if not exists licenses_created_idx on public.licenses (created_at desc);
+
+-- ----------------------------------------------------------------------------
+-- 7. APPROVED_BUYERS  (emails allowed to register; populated by webhook/admin)
+-- ----------------------------------------------------------------------------
+create table if not exists public.approved_buyers (
+  id            uuid primary key default gen_random_uuid(),
+  email         text unique not null,
+  purchase_date timestamptz,
+  order_id      text,
+  license_key   text,
+  active        boolean not null default true,
+  created_at    timestamptz not null default now()
+);
+create index if not exists approved_buyers_email_idx on public.approved_buyers (lower(email));
+
+-- ----------------------------------------------------------------------------
+-- 8. ADMIN_USERS  (admin-panel logins; separate from app auth.users)
+--    password_hash is a bcrypt hash. Seeded from ADMIN_EMAIL/ADMIN_PASSWORD.
+-- ----------------------------------------------------------------------------
+create table if not exists public.admin_users (
+  id            uuid primary key default gen_random_uuid(),
+  email         text unique not null,
+  password_hash text not null,
+  created_at    timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- 9. WEBHOOK_LOGS  (every ClickFunnels webhook attempt, for admin diagnostics)
+--    status: 'success' | 'failed' | 'skipped' | 'rejected'
+-- ----------------------------------------------------------------------------
+create table if not exists public.webhook_logs (
+  id          uuid primary key default gen_random_uuid(),
+  source      text not null default 'clickfunnels',
+  email       text,
+  order_id    text,
+  status      text not null,
+  detail      text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists webhook_logs_created_idx on public.webhook_logs (created_at desc);
+
+-- Permanently link each activated account to the license key it used.
+alter table public.profiles add column if not exists license_key text;
+
+-- ============================================================================
+--  PROJECTS  (Added 2026-06-16)
+--  Named workspaces — different products an owner is building. Each project
+--  carries its own copy of the 17 Yellow Brick Road steps (completion + the
+--  work saved in each step). The global `progress` table above is unchanged
+--  and still drives the main My-Progress checklist + sidebar slider.
+-- ============================================================================
+
+-- 10. PROJECTS  (one row per named project)
+create table if not exists public.projects (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists projects_user_idx on public.projects (user_id, updated_at desc);
+
+-- 11. PROJECT_STEPS  (per-project copy of the 17 steps: completion + saved work)
+--     step_key is one of ybr-1 .. ybr-17 (see client/src/lib/ybrSteps.js).
+create table if not exists public.project_steps (
+  id           uuid primary key default gen_random_uuid(),
+  project_id   uuid not null references public.projects(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  step_key     text not null,
+  completed    boolean not null default false,
+  completed_at timestamptz,
+  content      text,                 -- the Tin Man's auto-saved output for this step
+  notes        text,                 -- the owner's own notes (never overwritten by the walkthrough)
+  updated_at   timestamptz not null default now(),
+  unique (project_id, step_key)
+);
+create index if not exists project_steps_project_idx on public.project_steps (project_id);
+
+-- Add the owner-notes column to any project_steps table created before it existed.
+alter table public.project_steps
+  add column if not exists notes text;
+
+-- Which project the guided walkthrough currently auto-saves into (null = none).
+alter table public.profiles
+  add column if not exists active_project_id uuid references public.projects(id) on delete set null;
+
+-- own rows only ---------------------------------------------------------------
+alter table public.projects      enable row level security;
+alter table public.project_steps enable row level security;
+
+drop policy if exists "projects_all_own" on public.projects;
+create policy "projects_all_own" on public.projects
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "project_steps_all_own" on public.project_steps;
+create policy "project_steps_all_own" on public.project_steps
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Keep projects.updated_at fresh on every update.
+drop trigger if exists projects_set_updated_at on public.projects;
+create trigger projects_set_updated_at
+  before update on public.projects
+  for each row execute function public.set_updated_at();
+
+-- Keep project_steps.updated_at fresh on every update.
+drop trigger if exists project_steps_set_updated_at on public.project_steps;
+create trigger project_steps_set_updated_at
+  before update on public.project_steps
+  for each row execute function public.set_updated_at();
+
+-- Lock these tables down: RLS on, and intentionally NO policies. The browser
+-- (anon/authenticated) is therefore denied all access; the backend uses the
+-- service-role key, which bypasses RLS.
+alter table public.licenses        enable row level security;
+alter table public.approved_buyers enable row level security;
+alter table public.admin_users     enable row level security;
+alter table public.webhook_logs    enable row level security;
+
+-- ============================================================================
+--  Done. Tables: profiles, messages, saves, progress, wins,
+--                projects, project_steps,
+--                licenses, approved_buyers, admin_users, webhook_logs.
+-- ============================================================================

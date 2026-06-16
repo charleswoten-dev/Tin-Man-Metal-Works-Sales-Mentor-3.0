@@ -1,0 +1,148 @@
+/* Gentle heads-up banner (day 80 / 87) — sits at the top of the app content. */
+.apit-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 26px 0;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  background: rgba(0, 200, 83, 0.1);
+}
+.apit-banner-icon { font-size: 20px; flex-shrink: 0; }
+.apit-banner-text {
+  flex: 1;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.apit-banner-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.apit-banner-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--green);
+  color: #04210f;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.apit-banner-btn:hover { background: var(--green-bright); }
+.apit-banner-dismiss {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.apit-banner-dismiss:hover { border-color: var(--text-muted); color: var(--text); }
+
+/* Day-90 walkthrough modal. */
+.apit-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(4, 8, 6, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.apit-modal {
+  width: 500px;
+  max-width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.apit-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.apit-modal-head h2 { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }
+.apit-lede { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+
+.apit-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.apit-steps li { font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.apit-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12.5px;
+}
+
+.apit-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.apit-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.12); }
+.apit-input::placeholder { color: var(--text-muted); }
+
+.apit-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(229, 57, 53, 0.12);
+  border: 1px solid rgba(229, 57, 53, 0.35);
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+.apit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+.apit-link {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.apit-link:hover { color: var(--text-secondary); }
+.apit-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--green);
+  color: #04210f;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.apit-btn:hover:not(:disabled) { background: var(--green-bright); }
+.apit-btn:disabled { opacity: 0.55; cursor: default; }
