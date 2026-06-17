@@ -19,6 +19,8 @@ import { WALKTHROUGH_KICKOFF } from '../lib/walkthrough.js';
 import './Chat.css';
 
 const WALKTHROUGH_OFFERED_KEY = 'tinman_walkthrough_offered';
+// Which chat thread the owner last had open ('' / absent = the General thread).
+const THREAD_STORAGE_KEY = 'tinman_chat_thread';
 
 function TypingIndicator() {
   return (
@@ -127,6 +129,15 @@ export default function Chat() {
   const [error, setError] = useState('');
   const [voiceOut, setVoiceOut] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  // Per-project chat threads. threadId === null is the shared "General" thread;
+  // a project id scopes the conversation to that project. `threads` feeds the
+  // header switcher. Seeded from localStorage so a refresh keeps you put.
+  const [threadId, setThreadId] = useState(() => localStorage.getItem(THREAD_STORAGE_KEY) || null);
+  const [threads, setThreads] = useState([]);
+  const threadIdRef = useRef(threadId);
+  // A message we want to send the moment a thread switch finishes loading (used
+  // when a walkthrough is launched for a specific project from another view).
+  const pendingSendRef = useRef(null);
   const [offerDismissed, setOfferDismissed] = useState(
     () => localStorage.getItem(WALKTHROUGH_OFFERED_KEY) === '1'
   );
@@ -192,19 +203,61 @@ export default function Chat() {
     }
   }, [profile?.active_project_id]);
 
-  // Load this user's saved history on mount.
+  // Keep a ref of the live thread id so fire-and-forget persistence tags the
+  // right thread even if state has moved on.
+  useEffect(() => { threadIdRef.current = threadId; }, [threadId]);
+
+  // Load the project list that feeds the thread switcher, and drop a stale
+  // selection back to General if its project was deleted.
   useEffect(() => {
     if (!user?.id) return;
-    supabase
+    let cancelled = false;
+    const load = () => {
+      supabase
+        .from('projects')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => {
+          if (cancelled) return;
+          const list = data || [];
+          setThreads(list);
+          if (threadIdRef.current && !list.some((p) => p.id === threadIdRef.current)) {
+            switchThread(null);
+          }
+        });
+    };
+    load();
+    window.addEventListener('tinman:projects-changed', load);
+    return () => { cancelled = true; window.removeEventListener('tinman:projects-changed', load); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Load the open thread's history. Re-runs whenever the thread changes, and
+  // fires any send that was queued for after the switch.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    setHistoryLoaded(false);
+    let q = supabase
       .from('messages')
       .select('role, content, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        if (data) setMessages(data.map((m) => ({ role: m.role, content: m.content })));
-        setHistoryLoaded(true);
-      });
-  }, [user?.id]);
+      .eq('user_id', user.id);
+    q = threadId ? q.eq('project_id', threadId) : q.is('project_id', null);
+    q.order('created_at', { ascending: true }).then(({ data }) => {
+      if (cancelled) return;
+      const loaded = data ? data.map((m) => ({ role: m.role, content: m.content })) : [];
+      setMessages(loaded);
+      setHistoryLoaded(true);
+      if (pendingSendRef.current) {
+        const text = pendingSendRef.current;
+        pendingSendRef.current = null;
+        send(text, loaded); // build on this thread's freshly-loaded history
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, threadId]);
 
   // Auto-scroll to the newest message.
   useEffect(() => {
@@ -226,17 +279,25 @@ export default function Chat() {
   useEffect(() => {
     if (!historyLoaded || !location.state?.autosend) return;
     const text = location.state.autosend;
+    const launchProjectId = 'projectId' in location.state ? (location.state.projectId || null) : undefined;
+    navigate('.', { replace: true, state: null });
+    // Launching for a specific project: open that project's thread first, then
+    // queue the kickoff to fire once its history finishes loading.
+    if (launchProjectId !== undefined && launchProjectId !== threadIdRef.current) {
+      pendingSendRef.current = text;
+      switchThread(launchProjectId);
+      return;
+    }
     // A walkthrough launched from a project carries its id; a generic launch
     // carries null, which clears any stale project so it won't be written into.
-    if ('projectId' in location.state) {
-      activeProjectRef.current = location.state.projectId || null;
+    if (launchProjectId !== undefined) {
+      activeProjectRef.current = launchProjectId;
       activeProjectNameRef.current = location.state.projectName || null;
       // A real id means "continue THIS project" — lock it so the mentor's
       // kickoff name announcement can't create a duplicate. A null id is a
       // fresh start, which should be free to create/adopt a project by name.
-      lockedProjectRef.current = Boolean(location.state.projectId);
+      lockedProjectRef.current = Boolean(launchProjectId);
     }
-    navigate('.', { replace: true, state: null });
     send(text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyLoaded, location.state]);
@@ -253,20 +314,38 @@ export default function Chat() {
     if (!user?.id) return;
     supabase
       .from('messages')
-      .insert({ user_id: user.id, role, content })
+      .insert({ user_id: user.id, role, content, project_id: threadIdRef.current || null })
       .then(({ error: e }) => {
         if (e) console.error('Failed to save message:', e.message);
       });
   }
 
-  async function send(text) {
+  // Switch the open chat thread (null = General). Persists the choice so a
+  // refresh stays put, and points the walkthrough's save target at the same
+  // project so any steps completed in this thread file into the right place.
+  function switchThread(id) {
+    const next = id || null;
+    if (next === threadIdRef.current) return;
+    threadIdRef.current = next;
+    if (next) localStorage.setItem(THREAD_STORAGE_KEY, next);
+    else localStorage.removeItem(THREAD_STORAGE_KEY);
+    activeProjectRef.current = next;
+    activeProjectNameRef.current = next ? (threads.find((p) => p.id === next)?.name || null) : null;
+    lockedProjectRef.current = Boolean(next);
+    setThreadId(next);
+  }
+
+  async function send(text, baseOverride) {
     const content = text.trim();
     if (!content || sending) return;
 
     setError('');
     setInput('');
     const userMsg = { role: 'user', content };
-    const history = [...messages, userMsg];
+    // Normal sends build on the current messages; a send queued right after a
+    // thread switch passes the freshly-loaded thread history explicitly, since
+    // the closure's `messages` is still the old thread at that moment.
+    const history = [...(baseOverride || messages), userMsg];
     setMessages(history);
     setSending(true);
 
@@ -472,6 +551,7 @@ export default function Chat() {
   }
 
   const firstName = (profile?.name || '').split(' ')[0];
+  const currentThreadName = threadId ? (threads.find((p) => p.id === threadId)?.name || null) : null;
 
   return (
     <div className="chat">
@@ -482,6 +562,22 @@ export default function Chat() {
             <div className="chat-title">Tin Man Sales Mentor</div>
             <div className="chat-subtitle">Your CNC plasma sales coach</div>
           </div>
+        </div>
+        <div className="chat-thread-switch">
+          <label className="chat-thread-label" htmlFor="chat-thread">Chat</label>
+          <select
+            id="chat-thread"
+            className="chat-thread-select"
+            value={threadId || ''}
+            onChange={(e) => switchThread(e.target.value || null)}
+            disabled={sending}
+            title="Switch chat thread"
+          >
+            <option value="">General</option>
+            {threads.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
         {speechSupported && (
           <button
@@ -500,8 +596,12 @@ export default function Chat() {
         {messages.length === 0 && !sending && (
           <div className="chat-empty">
             <TinManIcon size={72} className="chat-empty-icon" />
-            <h2>{firstName ? `Hey ${firstName}!` : 'Hey there!'}</h2>
-            <p>Ask me anything about growing your plasma business — pricing, ads, offers, guarantees, or finding your niche.</p>
+            <h2>{currentThreadName ? currentThreadName : (firstName ? `Hey ${firstName}!` : 'Hey there!')}</h2>
+            <p>
+              {currentThreadName
+                ? `This is the chat for ${currentThreadName}. Everything you talk about here stays with this project.`
+                : 'Ask me anything about growing your plasma business — pricing, ads, offers, guarantees, or finding your niche.'}
+            </p>
 
             {!offerDismissed ? (
               <div className="chat-walkthrough-offer">

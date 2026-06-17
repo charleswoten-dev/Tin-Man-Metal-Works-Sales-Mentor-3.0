@@ -47,12 +47,18 @@ create table if not exists public.profiles (
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
+  -- which chat thread this message belongs to. null = the shared "General"
+  -- thread; a uuid ties it to that project's own thread. The FK to projects is
+  -- added after the projects table is created (see end of file).
+  project_id  uuid,
   role        text not null check (role in ('user', 'assistant')),
   content     text not null,
   created_at  timestamptz not null default now()
 );
 create index if not exists messages_user_created_idx
   on public.messages (user_id, created_at);
+create index if not exists messages_user_project_created_idx
+  on public.messages (user_id, project_id, created_at);
 
 -- ----------------------------------------------------------------------------
 -- 3. SAVES  (My Saves — saved bot messages, organized by type)
@@ -298,6 +304,21 @@ alter table public.project_steps
 -- Which project the guided walkthrough currently auto-saves into (null = none).
 alter table public.profiles
   add column if not exists active_project_id uuid references public.projects(id) on delete set null;
+
+-- Tie messages to a project thread now that projects exists (null = General
+-- thread). Deleting a project clears its chat thread along with it.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.table_constraints
+    where constraint_name = 'messages_project_id_fkey'
+      and table_name = 'messages'
+  ) then
+    alter table public.messages
+      add constraint messages_project_id_fkey
+      foreign key (project_id) references public.projects(id) on delete cascade;
+  end if;
+end $$;
 
 -- own rows only ---------------------------------------------------------------
 alter table public.projects      enable row level security;

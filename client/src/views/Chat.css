@@ -19,6 +19,37 @@
 .chat-title { font-size: 15px; font-weight: 700; color: var(--text); }
 .chat-subtitle { font-size: 12px; color: var(--text-secondary); }
 
+/* Per-project thread switcher */
+.chat-thread-switch {
+  margin-left: auto;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-thread-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.chat-thread-select {
+  max-width: 200px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chat-thread-select:hover { border-color: var(--text-muted); }
+.chat-thread-select:focus { outline: none; border-color: var(--green); }
+.chat-thread-select:disabled { opacity: .55; cursor: default; }
+
 /* Read-aloud toggle */
 .chat-voice-toggle {
   flex-shrink: 0;
