@@ -143,10 +143,13 @@ export default function Chat() {
     () => localStorage.getItem(WALKTHROUGH_OFFERED_KEY) === '1'
   );
   const scrollRef = useRef(null);
-  // Project the guided walkthrough auto-saves each completed step into. Seeded
-  // from the saved profile (survives refresh) and overridden by nav state when
-  // the walkthrough is launched for a specific project from the Progress page.
-  const activeProjectRef = useRef(null);
+  // Fallback save target for the rare case where a walkthrough launched from the
+  // General thread creates/adopts a project mid-conversation (threadId is still
+  // null then). In every normal case the save target is the OPEN THREAD itself
+  // (threadIdRef) — a completed step always files into the project whose thread
+  // you're chatting in, never a stale "active project" from elsewhere. Seeded to
+  // match the open thread so the two never disagree.
+  const activeProjectRef = useRef(threadId);
   const activeProjectNameRef = useRef(null);
   // True once we're committed to a specific project for this walkthrough — set
   // when launched from a project's "Run the walkthrough" button, or after we
@@ -186,23 +189,20 @@ export default function Chat() {
       .then(({ data }) => { shopRateRef.current = data || null; });
   }, [user?.id]);
 
-  // Seed the active walkthrough project from the saved profile, and fetch its
-  // name so the save confirmation can show it.
+  // Fetch the OPEN THREAD's project name so the "Saved to …" confirmation can
+  // show it. Keyed on the open thread (not the profile's active project) so the
+  // name always matches the project a completed step will actually file into.
   useEffect(() => {
-    if (profile && activeProjectRef.current == null) {
-      activeProjectRef.current = profile.active_project_id || null;
-      if (profile.active_project_id) {
-        supabase
-          .from('projects')
-          .select('name')
-          .eq('id', profile.active_project_id)
-          .single()
-          .then(({ data }) => {
-            if (data) activeProjectNameRef.current = data.name;
-          });
-      }
-    }
-  }, [profile?.active_project_id]);
+    if (!threadId) { activeProjectNameRef.current = null; return; }
+    supabase
+      .from('projects')
+      .select('name')
+      .eq('id', threadId)
+      .single()
+      .then(({ data }) => {
+        if (data) activeProjectNameRef.current = data.name;
+      });
+  }, [threadId]);
 
   // Keep a ref of the live thread id so fire-and-forget persistence tags the
   // right thread even if state has moved on.
@@ -515,7 +515,11 @@ export default function Chat() {
         if (e) console.error('Failed to mark step complete:', e.message);
       });
 
-    const projectId = activeProjectRef.current;
+    // Always file into the project whose thread we're chatting in. Fall back to
+    // activeProjectRef only for a General-thread walkthrough that created a
+    // project mid-conversation (threadId still null). This is what guarantees a
+    // step never leaks into another project's file.
+    const projectId = threadIdRef.current || activeProjectRef.current;
     if (projectId) {
       // Save ONLY the finalized deliverable the mentor read back for a step
       // (its STEP_SUMMARY) — never the surrounding chat. Steps that produced a
