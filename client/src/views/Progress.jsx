@@ -241,13 +241,14 @@ export default function Progress() {
               const checked = done.has(step.key);
               return (
                 <li key={step.key} className={'progress-step' + (checked ? ' done' : '')}>
+                  <span className="progress-step-num">{i + 1}</span>
                   <button
                     className="progress-check"
                     onClick={() => toggle(step.key)}
                     aria-pressed={checked}
                     aria-label={checked ? 'Mark incomplete' : 'Mark complete'}
                   >
-                    {checked ? <CheckIcon width={16} height={16} /> : <span className="step-num">{i + 1}</span>}
+                    {checked && <CheckIcon width={16} height={16} />}
                   </button>
                   <div className="progress-step-text" onClick={() => toggle(step.key)}>
                     <span className="progress-step-title">{step.title}</span>
@@ -455,13 +456,14 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
               return (
                 <li key={step.key} className={'progress-step project-step' + (s.completed ? ' done' : '')}>
                   <div className="project-step-row">
+                    <span className="progress-step-num">{i + 1}</span>
                     <button
                       className="progress-check"
                       onClick={() => toggleStep(step.key)}
                       aria-pressed={s.completed}
                       aria-label={s.completed ? 'Mark incomplete' : 'Mark complete'}
                     >
-                      {s.completed ? <CheckIcon width={16} height={16} /> : <span className="step-num">{i + 1}</span>}
+                      {s.completed && <CheckIcon width={16} height={16} />}
                     </button>
                     <div className="progress-step-text" onClick={() => openEditor(step.key)}>
                       <span className="progress-step-title">

@@ -157,6 +157,19 @@
 }
 .step-num { line-height: 1; }
 
+/* Persistent step number shown to the left of every check circle, so the
+   numbering stays visible even after a step is checked off. */
+.progress-step-num {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 30px; /* match the 30px check circle for vertical alignment */
+}
+.progress-step.done .progress-step-num { color: var(--green); }
+
 .progress-step-text {
   display: flex;
   flex-direction: column;
