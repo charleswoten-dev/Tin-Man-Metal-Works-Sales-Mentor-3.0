@@ -12,12 +12,26 @@ const SECRET_PLACEHOLDER = 'PASTE_A_STRONG_RANDOM_WEBHOOK_SECRET_HERE';
 const secretConfigured = Boolean(SECRET && SECRET !== SECRET_PLACEHOLDER);
 
 // Headers ClickFunnels (or a proxy) might use to carry the HMAC signature.
+// ClickFunnels 2.0's account-level outgoing webhooks send the first one; the
+// rest are kept as fallbacks for proxies/relays or other senders.
 const SIGNATURE_HEADERS = [
+  'x-webhook-clickfunnels-signature',
   'x-clickfunnels-signature',
   'x-cf-signature',
   'x-webhook-signature',
   'x-signature',
 ];
+
+// ClickFunnels 2.0 sends the request timestamp here and signs "{timestamp}.{body}".
+const TIMESTAMP_HEADERS = [
+  'x-webhook-clickfunnels-timestamp',
+  'x-clickfunnels-timestamp',
+  'x-webhook-timestamp',
+];
+
+// Reject signatures whose timestamp is older than this (replay protection).
+// Matches ClickFunnels' default 600s window.
+const TIMESTAMP_TOLERANCE_SECONDS = 600;
 
 // Write an audit row for every webhook attempt. Never throws — logging must not
 // break webhook processing.
@@ -35,11 +49,8 @@ async function logWebhook({ email, orderId, status, detail }) {
   }
 }
 
-// Constant-time comparison of the provided signature against HMAC-SHA256(raw).
-function verifySignature(rawBuffer, headerValue) {
-  if (!headerValue) return false;
-  const provided = String(headerValue).replace(/^sha256=/i, '').trim();
-  const expected = crypto.createHmac('sha256', SECRET).update(rawBuffer).digest('hex');
+// Constant-time hex-digest comparison.
+function safeEqualHex(provided, expected) {
   const a = Buffer.from(provided, 'utf8');
   const b = Buffer.from(expected, 'utf8');
   if (a.length !== b.length) return false;
@@ -50,24 +61,80 @@ function verifySignature(rawBuffer, headerValue) {
   }
 }
 
+// Verify the request signature.
+//
+// ClickFunnels 2.0 signs HMAC-SHA256 over "{timestamp}.{raw_body}" and sends the
+// digest in X-Webhook-ClickFunnels-Signature with the timestamp in
+// X-Webhook-ClickFunnels-Timestamp. We verify that scheme first (including a
+// freshness check to block replays). As a fallback — for relays/proxies or other
+// senders that sign just the raw body — we also accept HMAC-SHA256(raw_body).
+function verifySignature(rawBuffer, headerValue, timestampValue) {
+  if (!headerValue) return false;
+  const provided = String(headerValue).replace(/^sha256=/i, '').trim();
+
+  // Preferred: ClickFunnels 2.0 timestamp-prefixed scheme.
+  if (timestampValue) {
+    const ts = String(timestampValue).trim();
+    const tsNum = Number(ts);
+    // Reject stale/garbage timestamps (replay protection).
+    if (Number.isFinite(tsNum)) {
+      const ageSeconds = Math.abs(Date.now() / 1000 - tsNum);
+      if (ageSeconds <= TIMESTAMP_TOLERANCE_SECONDS) {
+        const signedPayload = Buffer.concat([
+          Buffer.from(`${ts}.`, 'utf8'),
+          rawBuffer,
+        ]);
+        const expected = crypto.createHmac('sha256', SECRET).update(signedPayload).digest('hex');
+        if (safeEqualHex(provided, expected)) return true;
+      }
+    }
+  }
+
+  // Fallback: signature over the raw body only (relays/proxies, legacy senders).
+  const expectedRaw = crypto.createHmac('sha256', SECRET).update(rawBuffer).digest('hex');
+  return safeEqualHex(provided, expectedRaw);
+}
+
 // ClickFunnels payload shapes vary; pull the fields we need from common spots.
+// ClickFunnels 2.0 wraps the subject (order/contact) under `data`, so we look
+// there as well as at the top level and inside purchase/order/customer objects.
 function extractFields(body) {
   const b = body || {};
-  const contact = b.contact || b.purchase?.contact || b.data?.contact || {};
+  const data = b.data || {};
+  // Where the buyer's details might live, in priority order.
+  const contact =
+    b.contact ||
+    b.purchase?.contact ||
+    data.contact ||
+    data.customer ||
+    data.order?.contact ||
+    data.order?.customer ||
+    {};
   const email =
-    b.email || contact.email || b.purchase?.email || b.data?.email || b.contact_email || null;
+    b.email ||
+    contact.email ||
+    contact.email_address ||
+    b.purchase?.email ||
+    data.email ||
+    data.customer?.email ||
+    data.order?.email ||
+    b.contact_email ||
+    null;
   const orderId =
     b.order_id ||
     b.id ||
     b.purchase?.id ||
     b.order?.id ||
-    b.data?.id ||
+    data.id ||
+    data.order?.id ||
+    data.order_id ||
     b.purchase_id ||
     null;
   const firstName =
     b.first_name ||
     contact.first_name ||
-    (b.name || contact.name || '').toString().trim().split(/\s+/)[0] ||
+    data.first_name ||
+    (b.name || contact.name || data.name || '').toString().trim().split(/\s+/)[0] ||
     '';
   return {
     email: email ? String(email).trim().toLowerCase() : null,
@@ -93,7 +160,8 @@ router.post('/clickfunnels', express.raw({ type: '*/*', limit: '1mb' }), async (
 
   // 1. Verify the signature on every request; reject anything unverified.
   const sigHeader = SIGNATURE_HEADERS.map((h) => req.headers[h]).find(Boolean);
-  if (!verifySignature(rawBuffer, sigHeader)) {
+  const tsHeader = TIMESTAMP_HEADERS.map((h) => req.headers[h]).find(Boolean);
+  if (!verifySignature(rawBuffer, sigHeader, tsHeader)) {
     await logWebhook({ status: 'rejected', detail: 'invalid or missing signature' });
     return res.status(401).json({ error: 'Invalid signature.' });
   }
