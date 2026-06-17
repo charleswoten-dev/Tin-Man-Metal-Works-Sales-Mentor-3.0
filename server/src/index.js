@@ -19,8 +19,14 @@ app.set('trust proxy', 1);
 // CORS allowlist — only our own app origins may call the API from a browser.
 // (Server-to-server callers like the ClickFunnels webhook send no Origin and
 // are unaffected.) Requests with no Origin header are allowed too.
+// APP_URL is the production client; ADDITIONAL_ORIGINS is an optional
+// comma-separated list (e.g. a custom domain plus a Vercel preview URL).
 const allowedOrigins = [
   process.env.APP_URL,
+  ...(process.env.ADDITIONAL_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
   'http://localhost:5173',
   'http://localhost:4173',
 ].filter(Boolean);

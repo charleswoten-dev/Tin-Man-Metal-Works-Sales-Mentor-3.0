@@ -1,0 +1,47 @@
+# Render Blueprint for the Tin Man server (Express API).
+# In Render: New → Blueprint → point at this repo. Render reads this file,
+# creates the service, and prompts you to fill in every `sync: false` secret.
+# The static CLIENT is deployed separately on Vercel (see DEPLOY.md) — this
+# blueprint covers only the backend.
+services:
+  - type: web
+    name: tin-man-server
+    runtime: node
+    rootDir: server
+    plan: starter # bump if you outgrow it; "free" sleeps after inactivity
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # --- Anthropic ---
+      - key: ANTHROPIC_API_KEY
+        sync: false # secret — set in dashboard
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      # --- Supabase (service-role key is SERVER-ONLY, never in the client) ---
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # secret
+      # --- ClickFunnels purchase webhook ---
+      - key: CLICKFUNNELS_WEBHOOK_SECRET
+        sync: false # secret — must match the value set in ClickFunnels
+      # --- Email (Resend) ---
+      - key: RESEND_API_KEY
+        sync: false # secret
+      - key: EMAIL_SERVICE
+        value: resend
+      - key: EMAIL_FROM
+        sync: false # e.g. "Tin Man <noreply@tinmanmetalworks.com>"
+      # --- App / CORS ---
+      - key: APP_URL
+        sync: false # the live client URL, e.g. https://app.tinmanmetalworks.com
+      - key: ADDITIONAL_ORIGINS
+        sync: false # optional: comma-separated extra origins (e.g. Vercel preview)
+      # --- Admin panel (/admin) ---
+      - key: ADMIN_JWT_SECRET
+        generateValue: true # Render generates a strong random secret
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false # secret — strong unique password
