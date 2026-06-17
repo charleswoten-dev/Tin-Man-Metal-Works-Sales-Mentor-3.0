@@ -333,6 +333,14 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
 
   useEffect(() => {
     if (!user?.id) return;
+    // Switching projects in place (via the dropdown) reuses this component, so
+    // close any open editor and clear its draft — otherwise the previous
+    // project's saved content lingers on screen under the new project's name,
+    // making every project look like it holds the same work.
+    setOpenKey(null);
+    setDraft('');
+    setDraftNotes('');
+    setSteps({});
     setLoading(true);
     supabase
       .from('project_steps')
