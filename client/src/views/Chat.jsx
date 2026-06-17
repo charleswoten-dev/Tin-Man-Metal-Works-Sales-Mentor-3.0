@@ -156,6 +156,11 @@ export default function Chat() {
   // create/adopt one. While locked, the mentor re-announcing the project name
   // at kickoff must NOT spin up a duplicate project.
   const lockedProjectRef = useRef(false);
+  // Ids of the messages that currently belong to the General thread (the ones on
+  // screen). If a walkthrough started in General adopts/creates a project
+  // mid-conversation, these get re-homed into that project so switching into its
+  // thread keeps the conversation intact instead of blanking out.
+  const generalMsgIdsRef = useRef([]);
   // Transient "Saved to <project> ✓" confirmation shown after the walkthrough
   // auto-saves a completed step into the active project.
   const [savedToast, setSavedToast] = useState(null);
@@ -255,13 +260,18 @@ export default function Chat() {
     setHistoryLoaded(false);
     let q = supabase
       .from('messages')
-      .select('role, content, created_at')
+      .select('id, role, content, created_at')
       .eq('user_id', user.id);
     q = threadId ? q.eq('project_id', threadId) : q.is('project_id', null);
     q.order('created_at', { ascending: true }).then(({ data }) => {
       if (cancelled) return;
       const loaded = data ? data.map((m) => ({ role: m.role, content: m.content })) : [];
       setMessages(loaded);
+      // Start tracking General-thread messages fresh on every thread load. Only
+      // messages sent AFTER this point (i.e. the walkthrough we're about to run)
+      // get re-homed if a project is adopted — pre-existing General chat stays in
+      // General rather than being swept into the new project.
+      generalMsgIdsRef.current = [];
       setHistoryLoaded(true);
       if (pendingSendRef.current) {
         const text = pendingSendRef.current;
@@ -307,6 +317,9 @@ export default function Chat() {
     if (launchProjectId !== undefined) {
       activeProjectRef.current = launchProjectId;
       activeProjectNameRef.current = location.state.projectName || null;
+      // Only the walkthrough we're launching should re-home into a new project,
+      // not any General chat that happened before it.
+      generalMsgIdsRef.current = [];
       // A real id means "continue THIS project" — lock it so the mentor's
       // kickoff name announcement can't create a duplicate. A null id is a
       // fresh start, which should be free to create/adopt a project by name.
@@ -325,12 +338,20 @@ export default function Chat() {
   // Fire-and-forget persistence. The .then() is required: a supabase query
   // builder is lazy and won't send the request until it's awaited or thened.
   function persistMessage(role, content) {
-    if (!user?.id) return;
-    supabase
+    if (!user?.id) return Promise.resolve();
+    // Capture which thread this row is being filed under at call time — the open
+    // thread can change before the insert resolves.
+    const onGeneral = !threadIdRef.current;
+    return supabase
       .from('messages')
       .insert({ user_id: user.id, role, content, project_id: threadIdRef.current || null })
-      .then(({ error: e }) => {
-        if (e) console.error('Failed to save message:', e.message);
+      .select('id')
+      .single()
+      .then(({ data, error: e }) => {
+        if (e) { console.error('Failed to save message:', e.message); return; }
+        // Track General-thread ids so a project adopted mid-conversation can
+        // re-home the whole thread (see createProjectFromName).
+        if (onGeneral && data) generalMsgIdsRef.current.push(data.id);
       });
   }
 
@@ -376,8 +397,9 @@ export default function Chat() {
     setMessages(history);
     setSending(true);
 
-    // Persist the user's message (fire and forget).
-    persistMessage('user', content);
+    // Persist the user's message. Keep the promise so a project adopted later in
+    // this turn can wait for the row to land before re-homing the thread.
+    const userPersist = persistMessage('user', content);
 
     try {
       const { reply } = await apiPost('/chat', {
@@ -390,9 +412,14 @@ export default function Chat() {
       const botMsg = { role: 'assistant', content: clean };
       setMessages((prev) => [...prev, botMsg]);
       if (voiceOut && clean) speak(clean);
-      persistMessage('assistant', clean);
+      const botPersist = persistMessage('assistant', clean);
       // Create the project before saving any steps so the active project is set.
-      if (projectName) await createProjectFromName(projectName);
+      // Wait for both message rows to land first so the re-home (inside
+      // createProjectFromName) sweeps the full conversation, not a partial one.
+      if (projectName) {
+        await Promise.all([userPersist, botPersist]);
+        await createProjectFromName(projectName);
+      }
       markStepsComplete(stepKeys, clean, summaries);
     } catch (err) {
       setError("The Tin Man couldn't respond just now. Please try again.");
@@ -485,6 +512,20 @@ export default function Chat() {
         return;
       }
       projectId = data.id;
+    }
+    // If this walkthrough began on the General thread, every message so far was
+    // filed under General (project_id null). Move that conversation into the new
+    // project NOW — before the profile update below flips the active project and
+    // the open thread follows it — so switching into the project's thread keeps
+    // the conversation intact instead of reloading to an empty thread.
+    if (!threadIdRef.current && generalMsgIdsRef.current.length) {
+      const ids = [...generalMsgIdsRef.current];
+      const { error: moveErr } = await supabase
+        .from('messages')
+        .update({ project_id: projectId })
+        .in('id', ids);
+      if (moveErr) console.error('Failed to move conversation into project:', moveErr.message);
+      else generalMsgIdsRef.current = [];
     }
     activeProjectRef.current = projectId;
     activeProjectNameRef.current = name;
@@ -611,6 +652,7 @@ export default function Chat() {
     activeProjectRef.current = null;
     activeProjectNameRef.current = null;
     lockedProjectRef.current = false; // fresh start — let the name create/adopt a project
+    generalMsgIdsRef.current = []; // only THIS walkthrough's messages re-home into the new project
     send(WALKTHROUGH_KICKOFF);
   }
 
