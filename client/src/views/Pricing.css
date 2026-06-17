@@ -5,6 +5,30 @@
 }
 
 /* ---- header ---- */
+.pricing-head { position: relative; }
+
+/* Replay-walkthrough button, top-right of the header. */
+.pricing-tour-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pricing-tour-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.pricing-tour-btn svg { flex-shrink: 0; }
+
 .pricing-kicker {
   display: inline-block;
   font-size: 11px;

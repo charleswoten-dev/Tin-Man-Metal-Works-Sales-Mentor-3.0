@@ -11,9 +11,11 @@ import {
   MicIcon,
   SpeakerOnIcon,
   SpeakerOffIcon,
+  StopIcon,
   CopyIcon,
   CheckIcon,
   BookmarkIcon,
+  RefreshIcon,
 } from '../components/Icons.jsx';
 import { SAVE_TYPES } from '../lib/saveTypes.js';
 import { YBR_STEPS } from '../lib/ybrSteps.js';
@@ -47,7 +49,7 @@ const QUICK_STARTS = [
   { label: 'Come up with product titles', prompt: 'Help me come up with some strong product titles.' },
 ];
 
-function MessageActions({ content, onSave, onSaveToStep, projectActive }) {
+function MessageActions({ content, onSave, onSaveToStep, projectActive, onReadAloud, isPlaying, speechSupported }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [stepMenuOpen, setStepMenuOpen] = useState(false);
@@ -88,6 +90,18 @@ function MessageActions({ content, onSave, onSaveToStep, projectActive }) {
         {copied ? <CheckIcon width={15} height={15} /> : <CopyIcon width={15} height={15} />}
         <span>{copied ? 'Copied' : 'Copy'}</span>
       </button>
+
+      {speechSupported && (
+        <button
+          className={'msg-action' + (isPlaying ? ' playing' : '')}
+          onClick={onReadAloud}
+          title={isPlaying ? 'Stop reading' : 'Read this aloud'}
+          aria-pressed={isPlaying}
+        >
+          {isPlaying ? <StopIcon width={15} height={15} /> : <SpeakerOnIcon width={15} height={15} />}
+          <span>{isPlaying ? 'Stop' : 'Read aloud'}</span>
+        </button>
+      )}
 
       <div className="msg-save-wrap">
         <button
@@ -141,7 +155,7 @@ function MessageActions({ content, onSave, onSaveToStep, projectActive }) {
   );
 }
 
-function Message({ role, content, onSave, onSaveToStep, projectActive }) {
+function Message({ role, content, onSave, onSaveToStep, projectActive, onReadAloud, isPlaying, speechSupported }) {
   const isBot = role === 'assistant';
   return (
     <div className={'msg-row ' + (isBot ? 'bot' : 'user')}>
@@ -160,6 +174,9 @@ function Message({ role, content, onSave, onSaveToStep, projectActive }) {
             onSave={onSave}
             onSaveToStep={onSaveToStep}
             projectActive={projectActive}
+            onReadAloud={onReadAloud}
+            isPlaying={isPlaying}
+            speechSupported={speechSupported}
           />
         )}
       </div>
@@ -176,6 +193,10 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [voiceOut, setVoiceOut] = useState(false);
+  // Index of the message currently being read aloud (null = nothing playing).
+  // Lets each message's Read-aloud button show a Stop state only on the one
+  // that's actually speaking.
+  const [playingIdx, setPlayingIdx] = useState(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   // Per-project chat threads. threadId === null is the shared "General" thread;
   // a project id scopes the conversation to that project. `threads` feeds the
@@ -229,6 +250,12 @@ export default function Chat() {
   useEffect(() => {
     if (profile) setVoiceOut(Boolean(profile.voice_enabled));
   }, [profile?.voice_enabled]);
+
+  // When narration stops (finished or cancelled), drop the "playing" highlight
+  // so the per-message button flips back from Stop to Read aloud.
+  useEffect(() => {
+    if (!speaking) setPlayingIdx(null);
+  }, [speaking]);
 
   // Load the owner's saved shop rate once so the mentor can coach on real numbers.
   useEffect(() => {
@@ -458,7 +485,9 @@ export default function Chat() {
       const { clean, stepKeys, projectName, summaries } = extractStepMarkers(reply);
       const botMsg = { role: 'assistant', content: clean };
       setMessages((prev) => [...prev, botMsg]);
-      if (voiceOut && clean) speak(clean);
+      // The new bot message lands at index `history.length` (history already
+      // includes the user turn). Highlight it if we auto-read.
+      if (voiceOut && clean) { speak(clean); setPlayingIdx(history.length); }
       const botPersist = persistMessage('assistant', clean);
       // Create the project before saving any steps so the active project is set.
       // Wait for both message rows to land first so the re-home (inside
@@ -480,6 +509,19 @@ export default function Chat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send(input);
+    }
+  }
+
+  // Toggle reading a specific message aloud. Clicking the one that's currently
+  // playing stops it; clicking any other (or a stopped one) reads it — speak()
+  // cancels whatever's playing first, so this also handles "switch to this one".
+  function handleReadAloud(idx, content) {
+    if (playingIdx === idx && speaking) {
+      cancelSpeak();
+      setPlayingIdx(null);
+    } else {
+      speak(content);
+      setPlayingIdx(idx);
     }
   }
 
@@ -763,17 +805,28 @@ export default function Chat() {
             <div className="chat-subtitle">Your CNC plasma sales coach</div>
           </div>
         </div>
-        {speechSupported && (
+        <div className="chat-header-actions">
           <button
-            className={'chat-voice-toggle' + (voiceOut ? ' on' : '') + (speaking ? ' speaking' : '')}
-            onClick={toggleVoiceOut}
-            aria-pressed={voiceOut}
-            aria-label={voiceOut ? 'Turn off read aloud' : 'Turn on read aloud'}
-            title={voiceOut ? 'Read aloud: on' : 'Read aloud: off'}
+            className="chat-tour-btn"
+            data-tour="replay-tour"
+            onClick={() => window.dispatchEvent(new Event('tinman:replay-tour'))}
+            title="Replay the app walkthrough"
           >
-            {voiceOut ? <SpeakerOnIcon /> : <SpeakerOffIcon />}
+            <RefreshIcon width={16} height={16} />
+            <span>Replay walkthrough</span>
           </button>
-        )}
+          {speechSupported && (
+            <button
+              className={'chat-voice-toggle' + (voiceOut ? ' on' : '') + (speaking ? ' speaking' : '')}
+              onClick={toggleVoiceOut}
+              aria-pressed={voiceOut}
+              aria-label={voiceOut ? 'Turn off read aloud' : 'Turn on read aloud'}
+              title={voiceOut ? 'Read aloud: on' : 'Read aloud: off'}
+            >
+              {voiceOut ? <SpeakerOnIcon /> : <SpeakerOffIcon />}
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="chat-scroll" ref={scrollRef}>
@@ -832,6 +885,9 @@ export default function Chat() {
             onSave={saveMessage}
             onSaveToStep={saveMessageToStep}
             projectActive={Boolean(threadId)}
+            speechSupported={speechSupported}
+            isPlaying={playingIdx === i && speaking}
+            onReadAloud={() => handleReadAloud(i, m.content)}
           />
         ))}
 

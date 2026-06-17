@@ -68,6 +68,7 @@ export default function ProjectTabs({ active }) {
         <button
           type="button"
           role="tab"
+          data-tour="view-chat"
           aria-selected={active === 'chat'}
           className={'project-tab' + (active === 'chat' ? ' active' : '')}
           onClick={() => active !== 'chat' && navigate('/chat')}
@@ -78,6 +79,7 @@ export default function ProjectTabs({ active }) {
         <button
           type="button"
           role="tab"
+          data-tour="view-progress"
           aria-selected={active === 'progress'}
           className={'project-tab' + (active === 'progress' ? ' active' : '')}
           onClick={() => active !== 'progress' && navigate('/progress')}

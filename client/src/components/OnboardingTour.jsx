@@ -4,11 +4,13 @@ import './OnboardingTour.css';
 
 // The guided walkthrough shown to first-time users. Each step either spotlights
 // a real element (by CSS selector) or shows a centered card (target: null).
-const STEPS = [
+// Exported so callers can replay it, and so other tours (e.g. Pricing) can
+// reuse the same component with a different step list.
+export const MENU_TOUR_STEPS = [
   {
     target: null,
     title: 'Welcome to your Tin Man Sales Mentor',
-    body: "I'm your CNC plasma sales coach. Let me give you a 20-second tour so you know where everything lives.",
+    body: "I'm your CNC plasma sales coach. Let me give you a quick tour so you know where everything lives.",
   },
   {
     target: 'a[href="/chat"]',
@@ -17,8 +19,8 @@ const STEPS = [
   },
   {
     target: 'a[href="/progress"]',
-    title: 'My Progress',
-    body: 'Your Yellow Brick Road — 17 steps to a thriving plasma business. Check them off as you go.',
+    title: 'My Projects',
+    body: 'Your Yellow Brick Road — 17 steps to a thriving plasma business. Each project tracks its own progress; check steps off as you go.',
   },
   {
     target: 'a[href="/saves"]',
@@ -28,7 +30,7 @@ const STEPS = [
   {
     target: 'a[href="/niche-library"]',
     title: 'Niche Library',
-    body: 'Ten proven plasma niches to spark ideas, each with one-tap coaching.',
+    body: 'Seventeen proven plasma niches to spark ideas, each with one-tap coaching.',
   },
   {
     target: 'a[href="/win-wall"]',
@@ -36,9 +38,29 @@ const STEPS = [
     body: 'Share your wins and get fired up by what other shop owners are landing.',
   },
   {
+    target: 'a[href="/pricing"]',
+    title: 'Pricing & Quotes',
+    body: "Build your true shop rate once, then quote every job from your real costs — so every price actually makes you money. It has its own quick tour when you open it.",
+  },
+  {
     target: 'a[href="/settings"]',
     title: 'Settings',
-    body: 'Read-aloud voice, your account, and preferences all live here.',
+    body: 'Read-aloud voice, your account, your API key, and replaying this tour all live here.',
+  },
+  {
+    target: '[data-tour="view-chat"]',
+    title: 'Chat view',
+    body: 'Up top right, the Chat tab keeps you talking to your coach about whichever project is picked in the dropdown beside it.',
+  },
+  {
+    target: '[data-tour="view-progress"]',
+    title: 'Progress view',
+    body: "Right next to it, the Progress tab flips to that same project's 17-step roadmap. Same project, two views — one click apart.",
+  },
+  {
+    target: '[data-tour="replay-tour"]',
+    title: 'Replay this walkthrough',
+    body: "Forget where something lives? Tap Replay walkthrough up here anytime to run this tour again.",
   },
   {
     target: null,
@@ -50,11 +72,11 @@ const STEPS = [
 
 const PAD = 8; // breathing room around the spotlighted element
 
-export default function OnboardingTour({ onFinish }) {
+export default function OnboardingTour({ steps = MENU_TOUR_STEPS, onFinish, ariaLabel = 'App tour' }) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
 
-  const current = STEPS[step];
+  const current = steps[step];
   const isCentered = !current.target;
 
   // Measure the spotlighted element (and re-measure on resize). Runs in a layout
@@ -88,15 +110,17 @@ export default function OnboardingTour({ onFinish }) {
   }, [onFinish]);
 
   function next() {
-    if (step >= STEPS.length - 1) onFinish();
+    if (step >= steps.length - 1) onFinish();
     else setStep((s) => s + 1);
   }
   function back() {
     setStep((s) => Math.max(0, s - 1));
   }
 
-  // Position the tooltip: centered when there's no target, otherwise just to the
-  // right of the spotlighted sidebar item (clamped to stay on screen).
+  // Position the tooltip: centered when there's no target, otherwise beside the
+  // spotlighted element. Prefer the right; if there isn't room (e.g. top-right
+  // toolbar buttons) flip to the left. Always clamped to stay on screen.
+  const TIP_W = 320; // matches .tour-tip width in CSS
   let tipStyle;
   if (isCentered || !rect) {
     tipStyle = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
@@ -105,7 +129,12 @@ export default function OnboardingTour({ onFinish }) {
       Math.max(rect.top + rect.height / 2 - 70, 16),
       window.innerHeight - 200
     );
-    tipStyle = { top: `${top}px`, left: `${rect.left + rect.width + 22}px` };
+    let left = rect.left + rect.width + 22; // prefer right of the target
+    if (left + TIP_W > window.innerWidth - 16) {
+      left = rect.left - TIP_W - 22; // no room on the right → place on the left
+    }
+    left = Math.max(16, Math.min(left, window.innerWidth - TIP_W - 16));
+    tipStyle = { top: `${top}px`, left: `${left}px` };
   }
 
   // Spotlight box: a transparent rect with a huge box-shadow that dims everything
@@ -120,7 +149,7 @@ export default function OnboardingTour({ onFinish }) {
     : null;
 
   return (
-    <div className="tour-root" role="dialog" aria-modal="true" aria-label="App tour">
+    <div className="tour-root" role="dialog" aria-modal="true" aria-label={ariaLabel}>
       {spotStyle ? (
         <div className="tour-spot" style={spotStyle} />
       ) : (
@@ -131,7 +160,7 @@ export default function OnboardingTour({ onFinish }) {
         {isCentered && <TinManIcon size={48} className="tour-tip-icon" />}
         <div className="tour-tip-head">
           <span className="tour-step-count">
-            {step + 1} / {STEPS.length}
+            {step + 1} / {steps.length}
           </span>
           <button className="tour-skip" onClick={onFinish}>
             Skip tour
@@ -141,7 +170,7 @@ export default function OnboardingTour({ onFinish }) {
         <p className="tour-tip-body">{current.body}</p>
 
         <div className="tour-dots">
-          {STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <span key={i} className={'tour-dot' + (i === step ? ' on' : '')} />
           ))}
         </div>

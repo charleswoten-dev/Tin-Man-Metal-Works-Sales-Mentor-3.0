@@ -5,7 +5,42 @@ import { supabase } from '../lib/supabase.js';
 import {
   computeShopRate, computeQuote, RATE_DEFAULTS, QUOTE_DEFAULTS, defaultThicknessRates,
 } from '../lib/pricing.js';
+import OnboardingTour from '../components/OnboardingTour.jsx';
+import { RefreshIcon } from '../components/Icons.jsx';
 import './Pricing.css';
+
+// First-open walkthrough for the Pricing tab. Spotlights the three sub-tabs so a
+// shop owner knows the flow: set your rate once → quote jobs from it → track them.
+const PRICING_TOUR_STEPS = [
+  {
+    target: null,
+    title: 'Pricing & Quotes',
+    body: "This is where you stop guessing on price. Quick tour so you know the flow — it takes about 20 seconds.",
+  },
+  {
+    target: '[data-tour="ptab-rate"]',
+    title: '① Build My Shop Rate',
+    body: 'Start here. Enter your wage, machine cost, and overhead once and we calculate your true hourly rate — the floor every quote is built on.',
+  },
+  {
+    target: '[data-tour="ptab-quote"]',
+    title: '② Quote a Job',
+    body: 'Punch in material, cut length, pierces, and finishing. You get a price per part, a total, and your real profit — then send it to your coach for a gut-check.',
+  },
+  {
+    target: '[data-tour="ptab-saved"]',
+    title: '📁 Saved Quotes',
+    body: 'Every quote you save lands here. Mark them draft, sent, won, or lost, and clone past jobs to quote new ones fast.',
+  },
+  {
+    target: null,
+    title: "That's the pricing shop",
+    body: "Build your rate first, then quote with confidence. You can replay this anytime with the button up top.",
+    final: true,
+  },
+];
+
+const pricingTourKey = (userId) => `tinman:pricingTourSeen:${userId || 'anon'}`;
 
 const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const money0 = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
@@ -39,6 +74,20 @@ export default function Pricing() {
   const [loaded, setLoaded] = useState(false);
   const [rateSaved, setRateSaved] = useState(false);
   const [quoteSavedMsg, setQuoteSavedMsg] = useState('');
+  const [showTour, setShowTour] = useState(false); // pricing walkthrough
+
+  // Auto-run the pricing walkthrough the first time this user opens the tab.
+  // Gated in localStorage so it never replays on its own; "Replay walkthrough"
+  // re-triggers it manually.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!localStorage.getItem(pricingTourKey(user.id))) setShowTour(true);
+  }, [user?.id]);
+
+  const finishTour = () => {
+    if (user?.id) localStorage.setItem(pricingTourKey(user.id), '1');
+    setShowTour(false);
+  };
 
   // ---- load shop_rate + projects + saved quotes on mount --------------------
   const loadQuotes = useCallback(() => {
@@ -200,7 +249,19 @@ export default function Pricing() {
 
   return (
     <div className="pricing-view">
+      {showTour && (
+        <OnboardingTour steps={PRICING_TOUR_STEPS} onFinish={finishTour} ariaLabel="Pricing tour" />
+      )}
+
       <div className="pricing-head">
+        <button
+          className="pricing-tour-btn"
+          onClick={() => setShowTour(true)}
+          title="Replay the pricing walkthrough"
+        >
+          <RefreshIcon width={16} height={16} />
+          <span>Replay walkthrough</span>
+        </button>
         <span className="pricing-kicker">YBR · Know Your Numbers</span>
         <h1 className="pricing-title">Pricing &amp; Quotes</h1>
         <p className="pricing-sub">
@@ -210,9 +271,9 @@ export default function Pricing() {
       </div>
 
       <div className="pricing-tabs">
-        <button className={tab === 'rate' ? 'on' : ''} onClick={() => setTab('rate')}>① Build My Shop Rate</button>
-        <button className={tab === 'quote' ? 'on' : ''} onClick={() => setTab('quote')}>② Quote a Job</button>
-        <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>
+        <button data-tour="ptab-rate" className={tab === 'rate' ? 'on' : ''} onClick={() => setTab('rate')}>① Build My Shop Rate</button>
+        <button data-tour="ptab-quote" className={tab === 'quote' ? 'on' : ''} onClick={() => setTab('quote')}>② Quote a Job</button>
+        <button data-tour="ptab-saved" className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>
           📁 Saved Quotes{savedQuotes.length ? ` (${savedQuotes.length})` : ''}
         </button>
       </div>

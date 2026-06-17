@@ -18,6 +18,15 @@ export default function Layout() {
   const [activeId, setActiveId] = useState(null); // selected project id (optimistic)
   const [activeCount, setActiveCount] = useState(0); // completed steps in the selected project
   const [startFreshOpen, setStartFreshOpen] = useState(false);
+  const [replayTour, setReplayTour] = useState(false); // user-triggered re-run of the menu tour
+
+  // Let any screen replay the menu walkthrough by firing this event (e.g. the
+  // "Replay walkthrough" button in the Chat header).
+  useEffect(() => {
+    const onReplay = () => setReplayTour(true);
+    window.addEventListener('tinman:replay-tour', onReplay);
+    return () => window.removeEventListener('tinman:replay-tour', onReplay);
+  }, []);
 
   // Mirror the persisted active project into local state so the sidebar can
   // also update it optimistically when the user switches.
@@ -112,8 +121,10 @@ export default function Layout() {
     }
   };
 
-  // Mark the walkthrough done so it never auto-shows again.
+  // Mark the walkthrough done so it never auto-shows again. Also clears a manual
+  // replay so the tour closes when finished/skipped.
   const finishTour = async () => {
+    setReplayTour(false);
     if (user?.id) {
       await supabase.from('profiles').update({ tour_completed: true }).eq('id', user.id);
       refreshProfile?.();
@@ -122,9 +133,12 @@ export default function Layout() {
 
   // First-run flow: collect onboarding answers, THEN run the guided tour. Each
   // gate waits for the profile to load so we don't flash either prematurely.
+  // A manual replay also shows the tour (once onboarding is done).
   const showOnboarding = Boolean(profile) && profile.onboarding_completed === false;
   const showTour =
-    Boolean(profile) && profile.onboarding_completed === true && profile.tour_completed === false;
+    Boolean(profile) &&
+    profile.onboarding_completed === true &&
+    (replayTour || profile.tour_completed === false);
 
   return (
     <div className="app-shell">

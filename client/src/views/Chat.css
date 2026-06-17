@@ -50,6 +50,28 @@
 .chat-thread-select:focus { outline: none; border-color: var(--green); }
 .chat-thread-select:disabled { opacity: .55; cursor: default; }
 
+.chat-header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+/* Text button to re-run the app walkthrough. */
+.chat-tour-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.chat-tour-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.chat-tour-btn svg { flex-shrink: 0; }
+
 /* Read-aloud toggle */
 .chat-voice-toggle {
   flex-shrink: 0;
@@ -210,6 +232,10 @@
   transition: color 0.15s, background 0.15s;
 }
 .msg-action:hover { color: var(--text); background: var(--card); }
+/* Active "reading aloud" state — accent the button while this message plays. */
+.msg-action.playing { color: var(--green-bright); }
+.msg-action.playing svg { animation: msg-action-pulse 1.4s ease-in-out infinite; }
+@keyframes msg-action-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
 .msg-save-wrap { position: relative; }
 .msg-save-menu {
