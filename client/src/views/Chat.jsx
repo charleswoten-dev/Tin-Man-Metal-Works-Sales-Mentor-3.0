@@ -214,7 +214,10 @@ export default function Chat() {
   useEffect(() => {
     if (!profile) return;
     const next = profile.active_project_id || null;
-    if (next !== threadIdRef.current) switchThread(next);
+    // persist=false: this switch is FOLLOWING the profile, so it must not write
+    // the profile back (that echo + refreshProfile re-triggers this effect and,
+    // with a stale closure, could land on the wrong project — the drift bug).
+    if (next !== threadIdRef.current) switchThread(next, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.active_project_id]);
 
@@ -334,7 +337,12 @@ export default function Chat() {
   // Switch the open chat thread (null = General). Persists the choice so a
   // refresh stays put, and points the walkthrough's save target at the same
   // project so any steps completed in this thread file into the right place.
-  function switchThread(id) {
+  // `persist` controls whether this switch writes the profile's active project.
+  // User-initiated switches (launching a project, dropping a deleted one) pass
+  // true so the rest of the app follows. A switch that is itself FOLLOWING a
+  // profile change passes false — writing back would loop through refreshProfile
+  // and, with a stale closure, could drift to the wrong project.
+  function switchThread(id, persist = true) {
     const next = id || null;
     if (next === threadIdRef.current) return;
     threadIdRef.current = next;
@@ -345,9 +353,8 @@ export default function Chat() {
     lockedProjectRef.current = Boolean(next);
     setThreadId(next);
     // Keep the profile's active project in lockstep so the Progress view + the
-    // tab bar reflect the same project. Skip if it already matches (e.g. when
-    // this switch was itself triggered by a profile change) to avoid a loop.
-    if (user?.id && next !== (profile?.active_project_id || null)) {
+    // tab bar reflect the same project.
+    if (persist && user?.id && next !== (profile?.active_project_id || null)) {
       supabase.from('profiles').update({ active_project_id: next }).eq('id', user.id).then(() => {
         refreshProfile?.();
         window.dispatchEvent(new Event('tinman:projects-changed'));
@@ -510,28 +517,61 @@ export default function Chat() {
 
     const projectId = activeProjectRef.current;
     if (projectId) {
-      const projectRows = stepKeys.map((step_key) => ({
-        project_id: projectId,
-        user_id: user.id,
-        step_key,
-        completed: true,
-        completed_at: now,
-        // Prefer the clean per-step deliverable; fall back to the full reply.
-        content: summaries[step_key] || content || null,
-      }));
-      supabase
-        .from('project_steps')
-        .upsert(projectRows, { onConflict: 'project_id,step_key' })
-        .then(({ error: e }) => {
-          if (e) {
-            console.error('Failed to save project step:', e.message);
-            return;
-          }
-          window.dispatchEvent(new Event('tinman:projects-changed'));
+      // Save ONLY the finalized deliverable the mentor read back for a step
+      // (its STEP_SUMMARY) — never the surrounding chat. Steps that produced a
+      // keepable result write their content; the rest just check off, with
+      // their content slot left untouched so nothing extraneous is stored and
+      // any work saved earlier is preserved.
+      const withSummary = stepKeys.filter((k) => summaries[k] && summaries[k].trim());
+      const withoutSummary = stepKeys.filter((k) => !(summaries[k] && summaries[k].trim()));
+
+      const writes = [];
+      if (withSummary.length) {
+        writes.push(
+          supabase.from('project_steps').upsert(
+            withSummary.map((step_key) => ({
+              project_id: projectId,
+              user_id: user.id,
+              step_key,
+              completed: true,
+              completed_at: now,
+              content: summaries[step_key].trim(),
+            })),
+            { onConflict: 'project_id,step_key' }
+          )
+        );
+      }
+      if (withoutSummary.length) {
+        // Note: `content` is intentionally omitted so an upsert conflict leaves
+        // any previously saved deliverable for this step in place.
+        writes.push(
+          supabase.from('project_steps').upsert(
+            withoutSummary.map((step_key) => ({
+              project_id: projectId,
+              user_id: user.id,
+              step_key,
+              completed: true,
+              completed_at: now,
+            })),
+            { onConflict: 'project_id,step_key' }
+          )
+        );
+      }
+
+      Promise.all(writes).then((results) => {
+        const failed = results.find((r) => r.error);
+        if (failed) {
+          console.error('Failed to save project step:', failed.error.message);
+          return;
+        }
+        window.dispatchEvent(new Event('tinman:projects-changed'));
+        // Only crow about a save when an actual deliverable was filed.
+        if (withSummary.length) {
           const label = activeProjectNameRef.current;
           setSavedToast(label ? `Saved to ${label}` : 'Saved to your project');
           setTimeout(() => setSavedToast(null), 3200);
-        });
+        }
+      });
     }
   }
 
