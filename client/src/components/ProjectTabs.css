@@ -1,0 +1,72 @@
+/* Shared project workspace bar (Chat | Progress). Sits at the very top of both
+   the Chat and Progress views so switching projects + flipping views is one tap. */
+.project-tabs {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.project-tabs-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.project-tabs-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.project-tabs-select {
+  max-width: 240px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.project-tabs-select:hover { border-color: var(--text-muted); }
+.project-tabs-select:focus { outline: none; border-color: var(--green); }
+
+/* Segmented Chat | Progress toggle */
+.project-tabs-toggle {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.project-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.project-tab:hover { color: var(--text); }
+.project-tab.active {
+  background: var(--green);
+  color: #04210f;
+}
+.project-tab-icon { flex-shrink: 0; }

@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase.js';
 import { apiPost } from '../lib/api.js';
 import { useVoice } from '../lib/useVoice.js';
 import TinManIcon from '../components/TinManIcon.jsx';
+import ProjectTabs from '../components/ProjectTabs.jsx';
 import {
   MicIcon,
   SpeakerOnIcon,
@@ -207,6 +208,16 @@ export default function Chat() {
   // right thread even if state has moved on.
   useEffect(() => { threadIdRef.current = threadId; }, [threadId]);
 
+  // Unify: the active project (chosen in the sidebar or the Chat/Progress tab
+  // bar) is the single source of truth. Whenever it changes, the open chat
+  // thread follows it so selecting a project lands you straight in its chat.
+  useEffect(() => {
+    if (!profile) return;
+    const next = profile.active_project_id || null;
+    if (next !== threadIdRef.current) switchThread(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.active_project_id]);
+
   // Load the project list that feeds the thread switcher, and drop a stale
   // selection back to General if its project was deleted.
   useEffect(() => {
@@ -333,6 +344,15 @@ export default function Chat() {
     activeProjectNameRef.current = next ? (threads.find((p) => p.id === next)?.name || null) : null;
     lockedProjectRef.current = Boolean(next);
     setThreadId(next);
+    // Keep the profile's active project in lockstep so the Progress view + the
+    // tab bar reflect the same project. Skip if it already matches (e.g. when
+    // this switch was itself triggered by a profile change) to avoid a loop.
+    if (user?.id && next !== (profile?.active_project_id || null)) {
+      supabase.from('profiles').update({ active_project_id: next }).eq('id', user.id).then(() => {
+        refreshProfile?.();
+        window.dispatchEvent(new Event('tinman:projects-changed'));
+      });
+    }
   }
 
   async function send(text, baseOverride) {
@@ -555,6 +575,7 @@ export default function Chat() {
 
   return (
     <div className="chat">
+      <ProjectTabs active="chat" />
       <header className="chat-header">
         <div className="chat-header-title">
           <TinManIcon size={30} className="chat-header-icon" />
@@ -562,22 +583,6 @@ export default function Chat() {
             <div className="chat-title">Tin Man Sales Mentor</div>
             <div className="chat-subtitle">Your CNC plasma sales coach</div>
           </div>
-        </div>
-        <div className="chat-thread-switch">
-          <label className="chat-thread-label" htmlFor="chat-thread">Chat</label>
-          <select
-            id="chat-thread"
-            className="chat-thread-select"
-            value={threadId || ''}
-            onChange={(e) => switchThread(e.target.value || null)}
-            disabled={sending}
-            title="Switch chat thread"
-          >
-            <option value="">General</option>
-            {threads.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
         </div>
         {speechSupported && (
           <button

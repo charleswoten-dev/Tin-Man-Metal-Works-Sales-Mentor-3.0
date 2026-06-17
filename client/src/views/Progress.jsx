@@ -5,10 +5,12 @@ import { supabase } from '../lib/supabase.js';
 import { YBR_STEPS } from '../lib/ybrSteps.js';
 import { WALKTHROUGH_KICKOFF, walkthroughKickoffForProject } from '../lib/walkthrough.js';
 import { CheckIcon } from '../components/Icons.jsx';
+import ProjectTabs from '../components/ProjectTabs.jsx';
 import './Progress.css';
 
 export default function Progress() {
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const activeId = profile?.active_project_id || null;
   const navigate = useNavigate();
   const location = useLocation();
   const [done, setDone] = useState(() => new Set());
@@ -68,17 +70,32 @@ export default function Progress() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Opened from the sidebar switcher: jump straight into that project's detail.
+  // The open detail is derived from the single active project: pick one (here,
+  // in the sidebar, or in the tab bar) and its checkmarked modules open; clear
+  // it (General) and we fall back to the overall list. Keeps every view aligned.
   useEffect(() => {
-    const id = location.state?.openProjectId;
-    if (!id || !projects.length) return;
-    const proj = projects.find((p) => p.id === id);
-    if (proj) {
-      setOpenProject(proj);
+    if (location.state?.openProjectId) {
+      // Legacy nav payload — clear it; the active project drives the view now.
       navigate(location.pathname, { replace: true, state: {} });
     }
+    if (!activeId) {
+      setOpenProject(null);
+      return;
+    }
+    if (!projects.length) return;
+    setOpenProject(projects.find((p) => p.id === activeId) || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state?.openProjectId, projects]);
+  }, [activeId, projects, location.state?.openProjectId]);
+
+  // Set the active project on the profile — the shared source of truth that the
+  // chat thread and this detail view both follow.
+  async function selectProject(id) {
+    const next = id || null;
+    if (next === activeId || !user?.id) return;
+    await supabase.from('profiles').update({ active_project_id: next }).eq('id', user.id);
+    refreshProfile?.();
+    window.dispatchEvent(new Event('tinman:projects-changed'));
+  }
 
   async function toggle(stepKey) {
     if (!user?.id || saving) return;
@@ -137,6 +154,7 @@ export default function Progress() {
     e.stopPropagation();
     if (!window.confirm(`Delete the project "${project.name}"? This removes its saved work and can't be undone.`)) return;
     setProjects((prev) => prev.filter((p) => p.id !== project.id));
+    if (project.id === activeId) await selectProject(null);
     await supabase.from('projects').delete().eq('id', project.id);
     window.dispatchEvent(new Event('tinman:projects-changed'));
   }
@@ -150,12 +168,12 @@ export default function Progress() {
     return (
       <ProjectDetail
         project={openProject}
-        onBack={() => {
-          setOpenProject(null);
+        onBack={async () => {
+          await selectProject(null);
           loadProjects();
         }}
         onDeleted={(id) => {
-          setOpenProject(null);
+          selectProject(null);
           setProjects((prev) => prev.filter((p) => p.id !== id));
         }}
         onRunWalkthrough={async () => {
@@ -180,6 +198,7 @@ export default function Progress() {
 
   return (
     <div className="progress-view">
+      <ProjectTabs active="progress" />
       <header className="view-header">
         <div>
           <h1>My Progress</h1>
@@ -271,7 +290,7 @@ export default function Progress() {
                 const c = stepCounts[p.id] || 0;
                 const ppct = Math.round((c / total) * 100);
                 return (
-                  <li key={p.id} className="project-card" onClick={() => setOpenProject(p)}>
+                  <li key={p.id} className="project-card" onClick={() => selectProject(p.id)}>
                     <div className="project-card-main">
                       <span className="project-card-name">{p.name}</span>
                       <div className="project-card-bar-row">
@@ -383,6 +402,7 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
 
   return (
     <div className="progress-view">
+      <ProjectTabs active="progress" />
       <header className="view-header project-detail-header">
         <div>
           <button className="project-back" onClick={onBack}>← All projects</button>
