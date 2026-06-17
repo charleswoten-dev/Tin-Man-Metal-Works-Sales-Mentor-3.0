@@ -247,6 +247,27 @@
 }
 .msg-save-menu button:hover { background: var(--bg); color: var(--green-bright); }
 
+/* The step picker lists all 17 steps, so cap its height and let it scroll. */
+.msg-step-menu {
+  min-width: 230px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.msg-step-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.msg-step-num {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.msg-step-menu button:hover .msg-step-num { color: var(--green-bright); }
+
 .msg-bubble {
   padding: 12px 15px;
   border-radius: 14px;

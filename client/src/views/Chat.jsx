@@ -16,6 +16,7 @@ import {
   BookmarkIcon,
 } from '../components/Icons.jsx';
 import { SAVE_TYPES } from '../lib/saveTypes.js';
+import { YBR_STEPS } from '../lib/ybrSteps.js';
 import { WALKTHROUGH_KICKOFF } from '../lib/walkthrough.js';
 import './Chat.css';
 
@@ -46,10 +47,12 @@ const QUICK_STARTS = [
   { label: 'Come up with product titles', prompt: 'Help me come up with some strong product titles.' },
 ];
 
-function MessageActions({ content, onSave }) {
+function MessageActions({ content, onSave, onSaveToStep, projectActive }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [stepMenuOpen, setStepMenuOpen] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [stepSaved, setStepSaved] = useState(false);
 
   async function handleCopy() {
     try {
@@ -70,6 +73,15 @@ function MessageActions({ content, onSave }) {
     }
   }
 
+  async function handleSaveToStep(stepKey) {
+    setStepMenuOpen(false);
+    const ok = await onSaveToStep(content, stepKey);
+    if (ok) {
+      setStepSaved(true);
+      setTimeout(() => setStepSaved(false), 1800);
+    }
+  }
+
   return (
     <div className="msg-actions">
       <button className="msg-action" onClick={handleCopy} title="Copy to clipboard">
@@ -80,7 +92,7 @@ function MessageActions({ content, onSave }) {
       <div className="msg-save-wrap">
         <button
           className="msg-action"
-          onClick={() => setMenuOpen((o) => !o)}
+          onClick={() => { setMenuOpen((o) => !o); setStepMenuOpen(false); }}
           title="Save this"
         >
           {saved ? <CheckIcon width={15} height={15} /> : <BookmarkIcon width={15} height={15} />}
@@ -97,11 +109,39 @@ function MessageActions({ content, onSave }) {
           </div>
         )}
       </div>
+
+      {/* File this message directly into one of the project's 17 steps. Only
+          offered when a project thread is open — a step always belongs to a
+          project. This is the manual fallback for when the mentor doesn't emit
+          a step marker on its own. */}
+      {projectActive && (
+        <div className="msg-save-wrap">
+          <button
+            className="msg-action"
+            onClick={() => { setStepMenuOpen((o) => !o); setMenuOpen(false); }}
+            title="Save to a project step"
+          >
+            {stepSaved ? <CheckIcon width={15} height={15} /> : <BookmarkIcon width={15} height={15} />}
+            <span>{stepSaved ? 'Saved' : 'Save to step'}</span>
+          </button>
+          {stepMenuOpen && (
+            <div className="msg-save-menu msg-step-menu">
+              <div className="msg-save-menu-label">Save to step…</div>
+              {YBR_STEPS.map((step, i) => (
+                <button key={step.key} onClick={() => handleSaveToStep(step.key)} title={step.desc}>
+                  <span className="msg-step-num">{i + 1}</span>
+                  <span>{step.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function Message({ role, content, onSave }) {
+function Message({ role, content, onSave, onSaveToStep, projectActive }) {
   const isBot = role === 'assistant';
   return (
     <div className={'msg-row ' + (isBot ? 'bot' : 'user')}>
@@ -114,7 +154,14 @@ function Message({ role, content, onSave }) {
             content
           )}
         </div>
-        {isBot && <MessageActions content={content} onSave={onSave} />}
+        {isBot && (
+          <MessageActions
+            content={content}
+            onSave={onSave}
+            onSaveToStep={onSaveToStep}
+            projectActive={projectActive}
+          />
+        )}
       </div>
     </div>
   );
@@ -629,6 +676,52 @@ export default function Chat() {
     return !saveErr;
   }
 
+  // Manually file a chat message into one of the open project's 17 steps. This
+  // is the owner-driven fallback for when the mentor doesn't emit a STEP_DONE
+  // marker on its own: it writes the message text into project_steps.content and
+  // marks the step complete, the same shape markStepsComplete uses. Only works
+  // when a project thread is open (a step always belongs to a project).
+  async function saveMessageToStep(content, stepKey) {
+    const projectId = threadIdRef.current || activeProjectRef.current;
+    if (!user?.id || !projectId || !stepKey) return false;
+    const now = new Date().toISOString();
+    const { error: stepErr } = await supabase
+      .from('project_steps')
+      .upsert(
+        {
+          project_id: projectId,
+          user_id: user.id,
+          step_key: stepKey,
+          completed: true,
+          completed_at: now,
+          content: content.trim(),
+        },
+        { onConflict: 'project_id,step_key' }
+      );
+    if (stepErr) {
+      console.error('Failed to save message to step:', stepErr.message);
+      return false;
+    }
+    // Also tick the global progress checkmark so the slider/overview agree.
+    supabase
+      .from('progress')
+      .upsert(
+        { user_id: user.id, step_key: stepKey, completed: true, completed_at: now },
+        { onConflict: 'user_id,step_key' }
+      )
+      .then(({ error: e }) => {
+        if (e) console.error('Failed to mark step complete:', e.message);
+      });
+    window.dispatchEvent(new Event('tinman:projects-changed'));
+    const stepNum = YBR_STEPS.findIndex((s) => s.key === stepKey) + 1;
+    const label = activeProjectNameRef.current;
+    setSavedToast(
+      label ? `Saved to Step ${stepNum} · ${label}` : `Saved to Step ${stepNum}`
+    );
+    setTimeout(() => setSavedToast(null), 3200);
+    return true;
+  }
+
   // Flip read-aloud and persist the choice to the profile.
   async function toggleVoiceOut() {
     const next = !voiceOut;
@@ -732,7 +825,14 @@ export default function Chat() {
         )}
 
         {messages.map((m, i) => (
-          <Message key={i} role={m.role} content={m.content} onSave={saveMessage} />
+          <Message
+            key={i}
+            role={m.role}
+            content={m.content}
+            onSave={saveMessage}
+            onSaveToStep={saveMessageToStep}
+            projectActive={Boolean(threadId)}
+          />
         ))}
 
         {sending && <TypingIndicator />}
