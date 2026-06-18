@@ -15,7 +15,10 @@ router.post('/', async (req, res) => {
     }
 
     // Days 1-90 use Charles's server key; after that, the user's own key (Step 16).
-    const apiKey = (userApiKey && userApiKey.trim()) || process.env.ANTHROPIC_API_KEY;
+    // Always .trim() — a stray space/newline pasted into the env var (or the user's
+    // key field) makes the x-api-key header malformed, which manifests as a
+    // connection-level "Premature close" rather than a clean 401.
+    const apiKey = (userApiKey && userApiKey.trim()) || (process.env.ANTHROPIC_API_KEY || '').trim();
     if (!apiKey || apiKey === PLACEHOLDER) {
       return res.status(500).json({ error: 'Server API key is not configured.' });
     }
