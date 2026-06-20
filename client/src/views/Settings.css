@@ -171,4 +171,29 @@
 .settings-key-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.12); }
 .settings-key-actions { display: flex; gap: 10px; }
 
+.settings-import-input {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.4;
+  outline: none;
+  resize: vertical;
+  word-break: break-all;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.settings-import-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.12); }
+.settings-import-msg {
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.settings-import-msg.ok { color: var(--green); }
+.settings-import-msg.bad { color: #ff8a80; }
+
 .settings-account-actions { display: flex; gap: 10px; flex-wrap: wrap; }

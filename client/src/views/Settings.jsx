@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { NICHES } from '../lib/niches.js';
 import { SpeakerOnIcon, SpeakerOffIcon, LogoutIcon } from '../components/Icons.jsx';
+import { stashImportFromCode } from '../lib/importHandoff.js';
 import './Settings.css';
 
 const TIME_OPTIONS = ['Just getting started', 'Less than a year', '1–3 years', '3+ years'];
@@ -42,6 +43,9 @@ export default function Settings() {
   const [editingKey, setEditingKey] = useState(false);
   const [keyInput, setKeyInput] = useState('');
   const [keyBusy, setKeyBusy] = useState(false);
+
+  const [importCode, setImportCode] = useState('');
+  const [importMsg, setImportMsg] = useState(''); // '', 'ok', 'bad'
 
   // Seed the editable form from the loaded profile.
   useEffect(() => {
@@ -100,6 +104,16 @@ export default function Settings() {
     await supabase.from('profiles').update({ anthropic_api_key: null }).eq('id', user.id);
     setKeyBusy(false);
     refreshProfile?.();
+  }
+
+  function runImport() {
+    const res = stashImportFromCode(importCode);
+    if (res.ok) {
+      setImportMsg('ok');
+      setImportCode('');
+    } else {
+      setImportMsg('bad');
+    }
   }
 
   async function replayTour() {
@@ -272,6 +286,43 @@ export default function Settings() {
               </div>
             </>
           )}
+        </section>
+
+        {/* Import from the free calculator */}
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <h2>Import from the free calculator</h2>
+            <p>
+              Used the free Shop Rate &amp; Quote Calculator? In the calculator click
+              <b> "Copy my numbers"</b>, then paste the code here to bring your shop rate and saved
+              quotes into your account.
+            </p>
+          </div>
+
+          <textarea
+            className="settings-import-input"
+            rows={3}
+            placeholder="Paste your import code here…"
+            value={importCode}
+            onChange={(e) => { setImportCode(e.target.value); setImportMsg(''); }}
+          />
+
+          {importMsg === 'bad' && (
+            <div className="settings-import-msg bad">
+              That code didn't look right. Copy it again from the calculator and paste the whole thing.
+            </div>
+          )}
+          {importMsg === 'ok' && (
+            <div className="settings-import-msg ok">
+              ✓ Found your numbers — confirm the import in the popup.
+            </div>
+          )}
+
+          <div className="settings-key-actions">
+            <button className="settings-btn primary" onClick={runImport} disabled={!importCode.trim()}>
+              Import my numbers
+            </button>
+          </div>
         </section>
 
         {/* Account */}

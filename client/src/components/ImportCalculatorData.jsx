@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
-import { getPendingImport, clearPendingImport } from '../lib/importHandoff.js';
+import { getPendingImport, clearPendingImport, IMPORT_STASHED_EVENT } from '../lib/importHandoff.js';
 import './ImportCalculatorData.css';
 
 // Columns we accept into shop_rate (everything else in the payload is ignored,
@@ -41,7 +41,11 @@ export default function ImportCalculatorData() {
 
   useEffect(() => {
     if (!user?.id) return;
-    setPayload(getPendingImport());
+    const refresh = () => setPayload(getPendingImport());
+    refresh();
+    // Also pick up a code pasted into Settings while the app is already open.
+    window.addEventListener(IMPORT_STASHED_EVENT, refresh);
+    return () => window.removeEventListener(IMPORT_STASHED_EVENT, refresh);
   }, [user?.id]);
 
   if (!payload || !user?.id) return null;
