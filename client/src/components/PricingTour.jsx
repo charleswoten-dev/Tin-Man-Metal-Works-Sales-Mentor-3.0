@@ -29,20 +29,23 @@ export default function PricingTour({ steps, run, onPrepare, onClose }) {
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [step]);
 
-  // On entering a step: let the parent set tab/mode/method, then scroll the
-  // target into view and measure once the DOM has settled.
+  // On entering a step: let the parent set tab/mode/method (which re-renders the
+  // form), then scroll the target into view and measure. Steps that switch
+  // mode/tab/method change layout AND scroll position, so we scroll instantly
+  // (no smooth animation race) and re-measure a few times to catch the late
+  // layout shift — otherwise the spotlight can stick at a stale position.
   useEffect(() => {
     if (!step) return;
     onPrepare?.(step);
-    let raf2;
-    const t = setTimeout(() => {
+    const timers = [];
+    timers.push(setTimeout(() => {
       const el = step.target ? document.querySelector(step.target) : null;
-      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      // measure a couple frames later so layout/scroll has applied
-      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(measure); });
-      return () => cancelAnimationFrame(raf1);
-    }, 80);
-    return () => { clearTimeout(t); if (raf2) cancelAnimationFrame(raf2); };
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'auto' });
+      measure();
+    }, 90));
+    timers.push(setTimeout(measure, 260));
+    timers.push(setTimeout(measure, 520));
+    return () => timers.forEach(clearTimeout);
   }, [step, onPrepare, measure]);
 
   // Keep the spotlight glued to the element as the page scrolls/resizes.
