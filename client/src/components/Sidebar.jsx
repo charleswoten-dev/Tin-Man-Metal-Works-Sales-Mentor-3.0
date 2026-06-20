@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import TinManIcon from './TinManIcon.jsx';
+import InstallApp from './InstallApp.jsx';
 import {
   ChatIcon, ProgressIcon, SavesIcon, PricingIcon,
   LibraryIcon, WinsIcon, SettingsIcon, RefreshIcon, LogoutIcon,
@@ -105,6 +106,8 @@ export default function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
+        <InstallApp />
+
         <button type="button" className="start-fresh-btn" onClick={onStartFresh}>
           <RefreshIcon className="nav-icon" />
           <span>Start Fresh</span>
