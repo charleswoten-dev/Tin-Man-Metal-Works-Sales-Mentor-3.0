@@ -1,0 +1,94 @@
+.ptour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+/* Full-screen dim used when a step has no specific target. */
+.ptour-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.66);
+}
+
+/* The "hole": a transparent box with a massive shadow that dims everything
+   outside it, plus a green ring around the highlighted field. */
+.ptour-spot {
+  position: absolute;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.66);
+  outline: 2px solid var(--green, #00c853);
+  outline-offset: 2px;
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+  pointer-events: none;
+}
+
+.ptour-bubble {
+  position: absolute;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  background: var(--card, #161616);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 14px;
+  padding: 16px 16px 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  color: var(--text, #f2f2f2);
+}
+.ptour-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text, #fff);
+}
+.ptour-body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary, #c7c7c7);
+}
+.ptour-body b { color: var(--text, #fff); }
+
+.ptour-foot {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ptour-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #8a8a8a);
+}
+.ptour-btns { display: flex; align-items: center; gap: 8px; }
+
+.ptour-skip,
+.ptour-back {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary, #c7c7c7);
+  cursor: pointer;
+  padding: 7px 8px;
+}
+.ptour-skip:hover,
+.ptour-back:hover { color: var(--text, #fff); }
+
+.ptour-next {
+  background: var(--green, #00c853);
+  color: #0a0a0a;
+  border: none;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ptour-next:hover { background: var(--green-bright, #00e676); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ptour-spot { transition: none; }
+}
