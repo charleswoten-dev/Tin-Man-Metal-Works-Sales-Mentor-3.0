@@ -5,6 +5,7 @@ import OnboardingTour from './OnboardingTour.jsx';
 import OnboardingQuestions from './OnboardingQuestions.jsx';
 import ApiTransition from './ApiTransition.jsx';
 import StartFreshModal from './StartFreshModal.jsx';
+import ImportCalculatorData from './ImportCalculatorData.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import './Layout.css';
@@ -158,6 +159,9 @@ export default function Layout() {
       </main>
       {showOnboarding && <OnboardingQuestions onFinish={refreshProfile} />}
       {showTour && <OnboardingTour onFinish={finishTour} />}
+      {/* Offer to import data carried over from the free calculator — only once
+          onboarding + tour are done so prompts don't stack. */}
+      {!showOnboarding && !showTour && <ImportCalculatorData />}
       {startFreshOpen && (
         <StartFreshModal
           onConfirm={handleStartFreshConfirm}
