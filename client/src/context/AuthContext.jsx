@@ -19,14 +19,35 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    let mounted = true;
+
+    // Supabase getSession() can hang indefinitely if the project is unreachable
+    // (e.g. free-tier auto-pause), freezing the app on the splash screen because
+    // setLoading(false) never runs. Force-clear loading after 8s so we fall
+    // through to the sign-in screen instead of spinning forever.
+    const timeout = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 8000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (mounted) setSession(data.session);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setLoading(false);
+        clearTimeout(timeout);
+      });
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+      if (mounted) setSession(newSession);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   // Load the profile row whenever the signed-in user changes.
