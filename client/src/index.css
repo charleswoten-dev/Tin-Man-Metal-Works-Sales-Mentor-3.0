@@ -55,3 +55,39 @@ body {
   font-size: 13px;
 }
 .md a { color: var(--green-bright); }
+
+/* Secondary / "ghost" buttons app-wide: outline them in their OWN text color so
+   they clearly read as clickable. The default --border (#2a2a2a) was almost
+   invisible on the dark background. This only recolors an already-present border
+   (no size/layout change); filled and primary/accent buttons are excluded so
+   their colored fills stay untouched. Easy to tweak or remove as one block. */
+.asset-action:not(.primary),
+.lmk-btn:not(.primary),
+.lmk-theme-btn:not(.active),
+.db-btn:not(.primary),
+.db-add,
+.cele-btn.ghost,
+.onb-btn.ghost,
+.onb-choice:not(.selected),
+.tour-btn.ghost,
+.settings-btn:not(.primary),
+.sf-btn:not(.primary),
+.ic-btn:not(.primary),
+.apit-btn,
+.apit-banner-btn,
+.mini-btn,
+.mode-toggle,
+.chat-thread-switch,
+.chat-tour-btn,
+.chat-voice-toggle:not(.on):not(.speaking),
+.pricing-tour-btn,
+.ptour-back,
+.project-back,
+.project-step-cancel,
+.project-step-toggle,
+.project-tabs-toggle,
+.niche-coach-btn,
+.start-fresh-btn,
+.signout-btn {
+  border-color: currentColor !important;
+}
