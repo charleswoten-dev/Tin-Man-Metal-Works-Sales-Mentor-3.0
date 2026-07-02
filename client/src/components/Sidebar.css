@@ -64,25 +64,12 @@
 }
 
 /* Progress slider under My Progress */
-.nav-progress {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 2px 12px 10px 44px;
-}
-.nav-progress-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.nav-progress-row {
+/* Progress bar sits directly under the active project's title. */
+.nav-project-progress {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 3px 12px 8px 59px;
 }
 .nav-progress-track {
   flex: 1;
@@ -100,10 +87,10 @@
 }
 .nav-progress-count {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   color: var(--green-bright);
-  min-width: 30px;
+  min-width: 26px;
   text-align: right;
 }
 

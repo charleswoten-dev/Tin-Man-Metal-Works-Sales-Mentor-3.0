@@ -155,7 +155,24 @@ function MessageActions({ content, onSave, onSaveToStep, projectActive, onReadAl
   );
 }
 
-function Message({ role, content, onSave, onSaveToStep, projectActive, onReadAloud, isPlaying, speechSupported }) {
+function SaveDreamBuyerButton({ dreamBuyer, onSave }) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    if (saving || saved) return;
+    setSaving(true);
+    const ok = await onSave(dreamBuyer);
+    setSaving(false);
+    if (ok) setSaved(true);
+  }
+  return (
+    <button className={'msg-dreambuyer-btn' + (saved ? ' saved' : '')} onClick={save} disabled={saving || saved}>
+      🎯 {saved ? `Saved “${dreamBuyer.name}” to your Dream Buyers ✓` : saving ? 'Saving…' : `Save “${dreamBuyer.name}” to my Dream Buyers list`}
+    </button>
+  );
+}
+
+function Message({ role, content, dreamBuyer, onSaveDreamBuyer, onSave, onSaveToStep, projectActive, onReadAloud, isPlaying, speechSupported }) {
   const isBot = role === 'assistant';
   return (
     <div className={'msg-row ' + (isBot ? 'bot' : 'user')}>
@@ -168,6 +185,7 @@ function Message({ role, content, onSave, onSaveToStep, projectActive, onReadAlo
             content
           )}
         </div>
+        {isBot && dreamBuyer && <SaveDreamBuyerButton dreamBuyer={dreamBuyer} onSave={onSaveDreamBuyer} />}
         {isBot && (
           <MessageActions
             content={content}
@@ -235,6 +253,9 @@ export default function Chat() {
   // The owner's saved shop rate (from the Pricing page), sent with each chat
   // request so the mentor can reference their real numbers and catch undercharging.
   const shopRateRef = useRef(null);
+  // The owner's saved dream buyers (names only) so the coach can offer to reuse
+  // one at Step 1 of a walkthrough instead of building from scratch.
+  const dreamBuyersRef = useRef([]);
   const {
     recognitionSupported,
     speechSupported,
@@ -266,6 +287,21 @@ export default function Chat() {
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => { shopRateRef.current = data || null; });
+  }, [user?.id]);
+
+  // Load the owner's saved dream buyers (names) so the coach can offer them.
+  useEffect(() => {
+    if (!user?.id) return;
+    const load = () =>
+      supabase
+        .from('avatars')
+        .select('name')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => { dreamBuyersRef.current = (data || []).map((a) => a.name); });
+    load();
+    window.addEventListener('tinman:avatars-changed', load);
+    return () => window.removeEventListener('tinman:avatars-changed', load);
   }, [user?.id]);
 
   // Fetch the OPEN THREAD's project name so the "Saved to …" confirmation can
@@ -480,10 +516,11 @@ export default function Chat() {
         messages: history,
         profile: profileForApi(),
         shopRate: shopRateRef.current,
+        dreamBuyers: dreamBuyersRef.current,
         userApiKey: profile?.anthropic_api_key || null,
       });
-      const { clean, stepKeys, projectName, summaries } = extractStepMarkers(reply);
-      const botMsg = { role: 'assistant', content: clean };
+      const { clean, stepKeys, projectName, summaries, dreamBuyer } = extractStepMarkers(reply);
+      const botMsg = { role: 'assistant', content: clean, dreamBuyer };
       setMessages((prev) => [...prev, botMsg]);
       // The new bot message lands at index `history.length` (history already
       // includes the user turn). Highlight it if we auto-read.
@@ -546,6 +583,9 @@ export default function Chat() {
     // A clean, self-contained recap of a step's deliverable, captured and saved
     // into the project file (and hidden from the chat). [\s\S] so it spans lines.
     const summaryRe = /\[\[STEP_SUMMARY:(ybr-(?:1[0-7]|[1-9]))\]\]([\s\S]*?)\[\[\/STEP_SUMMARY\]\]/g;
+    // A finished dream-buyer avatar the coach offers to save to the reusable
+    // "My Dream Buyers" library. [\s\S] so the content can span lines.
+    const dbRe = /\[\[DREAM_BUYER:([^\]]+)\]\]([\s\S]*?)\[\[\/DREAM_BUYER\]\]/g;
     const keys = new Set();
     let m;
     while ((m = stepRe.exec(text))) keys.add(m[1]);
@@ -558,13 +598,21 @@ export default function Chat() {
       const body = s[2].trim();
       if (body) summaries[s[1]] = body;
     }
+    let dreamBuyer = null;
+    let d;
+    while ((d = dbRe.exec(text))) {
+      const name = d[1].trim();
+      const body = d[2].trim();
+      if (name && body) dreamBuyer = { name, content: body };
+    }
     const clean = text
       .replace(summaryRe, '') // strip summary blocks before the loose-marker passes
+      .replace(dbRe, '')
       .replace(stepRe, '')
       .replace(nameRe, '')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
-    return { clean, stepKeys: [...keys], projectName, summaries };
+    return { clean, stepKeys: [...keys], projectName, summaries, dreamBuyer };
   }
 
   // Create a project from the name the mentor captured, make it the active
@@ -716,6 +764,18 @@ export default function Chat() {
       .from('saves')
       .insert({ user_id: user.id, content, type });
     return !saveErr;
+  }
+
+  // Save a finished dream-buyer avatar to the reusable "My Dream Buyers" library
+  // (the button the coach offers after building one in a walkthrough).
+  async function saveDreamBuyer(db) {
+    if (!user?.id || !db?.name || !db?.content) return false;
+    const { error } = await supabase
+      .from('avatars')
+      .insert({ user_id: user.id, name: db.name, content: db.content });
+    if (error) return false;
+    window.dispatchEvent(new Event('tinman:avatars-changed'));
+    return true;
   }
 
   // Manually file a chat message into one of the open project's 17 steps. This
@@ -882,6 +942,8 @@ export default function Chat() {
             key={i}
             role={m.role}
             content={m.content}
+            dreamBuyer={m.dreamBuyer}
+            onSaveDreamBuyer={saveDreamBuyer}
             onSave={saveMessage}
             onSaveToStep={saveMessageToStep}
             projectActive={Boolean(threadId)}

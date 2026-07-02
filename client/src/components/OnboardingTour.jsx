@@ -20,7 +20,17 @@ export const MENU_TOUR_STEPS = [
   {
     target: 'a[href="/progress"]',
     title: 'My Projects',
-    body: 'Your Yellow Brick Road — 17 steps to a thriving plasma business. Each project tracks its own progress; check steps off as you go.',
+    body: 'Your Yellow Brick Road — 17 steps to a thriving plasma business. Each project tracks its own progress; check steps off as you go. And finishing a project unlocks something big…',
+  },
+  {
+    target: null,
+    title: 'Done-for-you marketing',
+    body: "Once all 17 steps of a project are done, I'll write your marketing FOR you — a full landing page, a 7-part follow-up email sequence, a sales ad, and 3 lead magnet ideas (with a finished example of each). One click each, it saves into your project, and you can download any of it as a clean PDF.",
+  },
+  {
+    target: null,
+    title: 'See your landing page as a real page',
+    body: 'On the landing page, tap "Preview as a landing page" and I\'ll turn your copy into a real, styled funnel-page mockup — flip between color styles and download it as an image or PDF to build your actual page from.',
   },
   {
     target: 'a[href="/saves"]',

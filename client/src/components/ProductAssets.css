@@ -1,0 +1,220 @@
+/* Product-asset generator buttons + result modal.
+   Shown on a completed project (celebration card + bottom action bar). */
+
+.asset-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.asset-buttons.bar {
+  margin-top: 4px;
+}
+
+.asset-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--green);
+  background: rgba(0, 200, 83, 0.08);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.asset-btn:hover:not(:disabled) {
+  background: rgba(0, 200, 83, 0.16);
+  border-color: var(--green-bright);
+}
+.asset-btn:active:not(:disabled) { transform: translateY(1px); }
+.asset-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.asset-btn-icon { font-size: 18px; line-height: 1; }
+.asset-btn-label { line-height: 1.25; }
+
+.asset-hint,
+.asset-error {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.asset-error { color: #ff6b6b; }
+
+/* ---- Bottom action bar wrapper ---- */
+.asset-bar-section {
+  margin: 22px 0 8px;
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.asset-bar-section h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.asset-bar-section p.asset-bar-lead {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ---- Result modal ---- */
+.asset-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+.asset-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: min(720px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.asset-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.asset-modal-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); }
+.asset-modal-sub { font-size: 12.5px; color: var(--text-muted); }
+.asset-modal-x {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.asset-modal-x:hover { color: var(--text); }
+
+.asset-modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.asset-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.asset-modal-buttons { display: flex; gap: 10px; }
+.asset-modal-save-state { font-size: 13px; }
+.asset-saved { color: var(--green-bright); font-weight: 600; }
+.asset-writing { color: var(--green-bright); font-weight: 600; }
+
+/* Blinking cursor shown at the end of streaming text. */
+.asset-caret {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--green-bright);
+  animation: asset-blink 1s steps(2, start) infinite;
+}
+@keyframes asset-blink { to { visibility: hidden; } }
+
+.asset-action {
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.asset-action:hover { color: var(--text); border-color: var(--text-muted); }
+.asset-action.primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: #06210f;
+}
+.asset-action.primary:hover { background: var(--green-bright); border-color: var(--green-bright); }
+.asset-action.ghost { color: var(--text-secondary); }
+.asset-action:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ---- Inside the celebration card ---- */
+.cele-assets {
+  width: 100%;
+  max-width: 560px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.cele-assets-lead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ---- Lead magnet idea cards ---- */
+.lm-idea {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  margin-bottom: 12px;
+}
+.lm-idea:last-child { margin-bottom: 0; }
+.lm-idea-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--green-bright);
+}
+.lm-idea-body { font-size: 13.5px; }
+.lm-idea-body p { margin: 4px 0; }
+.lm-idea-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Nested example window sits above the ideas window. */
+.lm-example-overlay { z-index: 1100; background: rgba(0, 0, 0, 0.72); }
+.lm-example-idea {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.lm-example-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+@media (max-width: 560px) {
+  .asset-buttons { grid-template-columns: 1fr; }
+}

@@ -216,6 +216,26 @@
 .msg-row.user .msg-col { align-items: flex-end; }
 
 /* Copy / Save actions under bot messages */
+/* "Save to My Dream Buyers" CTA the coach offers after building an avatar. */
+.msg-dreambuyer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 2px 2px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--green);
+  background: rgba(0, 200, 83, 0.1);
+  color: var(--green-bright);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.msg-dreambuyer-btn:hover:not(:disabled) { background: rgba(0, 200, 83, 0.18); }
+.msg-dreambuyer-btn.saved { cursor: default; }
+.msg-dreambuyer-btn:disabled { opacity: 0.9; cursor: default; }
+
 .msg-actions { display: flex; gap: 4px; margin: 6px 0 0 2px; }
 .msg-action {
   display: flex;

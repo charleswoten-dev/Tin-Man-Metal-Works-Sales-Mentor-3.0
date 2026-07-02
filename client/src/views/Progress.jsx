@@ -6,6 +6,7 @@ import { YBR_STEPS } from '../lib/ybrSteps.js';
 import { WALKTHROUGH_KICKOFF, walkthroughKickoffForProject } from '../lib/walkthrough.js';
 import { CheckIcon } from '../components/Icons.jsx';
 import ProjectTabs from '../components/ProjectTabs.jsx';
+import ProductAssets from '../components/ProductAssets.jsx';
 import './Progress.css';
 
 export default function Progress() {
@@ -330,7 +331,20 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
   const [draft, setDraft] = useState(''); // Tin Man's output
   const [draftNotes, setDraftNotes] = useState(''); // owner's own notes
   const [savingKey, setSavingKey] = useState(null);
+  const [shopRate, setShopRate] = useState(null);
   const listRef = useRef(null);
+
+  // The owner's saved shop rate — passed to the asset generators so the mentor
+  // writes with their real numbers (same source the chat uses).
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('shop_rate')
+      .select('computed_rate_hr, computed_breakeven_hr')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setShopRate(data || null));
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -398,6 +412,15 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
     setOpenKey(null);
   }
 
+  // Save a generated asset into its matching step's content (keeps completed +
+  // notes as-is). If that step's editor is open, refresh the draft so the new
+  // work shows immediately instead of the stale textarea value.
+  async function saveAssetToStep(stepKey, content) {
+    await upsertStep(stepKey, { content });
+    if (openKey === stepKey) setDraft(content);
+    window.dispatchEvent(new Event('tinman:projects-changed'));
+  }
+
   async function handleDelete() {
     if (!window.confirm(`Delete the project "${project.name}"? This removes its saved work and can't be undone.`)) return;
     await supabase.from('projects').delete().eq('id', project.id);
@@ -442,6 +465,7 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
             projectName={project.name}
             onNewProject={onNewProject}
             onReview={() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            assetProps={{ project, steps, shopRate, onSaveAsset: saveAssetToStep }}
           />
         )}
 
@@ -512,6 +536,23 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
             })}
           </ol>
         )}
+
+        {allDone && !loading && (
+          <section className="asset-bar-section">
+            <h3>Turn this product into marketing</h3>
+            <p className="asset-bar-lead">
+              One click each — the Tin Man writes it from everything you built for {project.name}, saves it
+              into the matching step, and you can download it as a PDF.
+            </p>
+            <ProductAssets
+              project={project}
+              steps={steps}
+              shopRate={shopRate}
+              onSaveAsset={saveAssetToStep}
+              variant="bar"
+            />
+          </section>
+        )}
       </div>
     </div>
   );
@@ -522,7 +563,7 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
 // animate via pure CSS (no dependency).
 const CONFETTI_COLORS = ['#00C853', '#00E676', '#9be7b4', '#ffffff', '#1f8f4e'];
 
-function Celebration({ projectName, onNewProject, onReview }) {
+function Celebration({ projectName, onNewProject, onReview, assetProps }) {
   const pieces = useMemo(
     () =>
       Array.from({ length: 70 }, (_, i) => ({
@@ -561,6 +602,13 @@ function Celebration({ projectName, onNewProject, onReview }) {
           <button className="cele-btn" onClick={onNewProject}>Start a new project</button>
           <button className="cele-btn ghost" onClick={onReview}>Review my answers</button>
         </div>
+
+        {assetProps && (
+          <div className="cele-assets">
+            <p className="cele-assets-lead">Or let the Tin Man turn this product into ready-to-use marketing:</p>
+            <ProductAssets {...assetProps} variant="celebration" />
+          </div>
+        )}
       </div>
     </div>
   );

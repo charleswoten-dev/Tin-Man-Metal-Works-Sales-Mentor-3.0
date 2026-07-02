@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import TinManIcon from './TinManIcon.jsx';
 import InstallApp from './InstallApp.jsx';
+import DreamBuyers from './DreamBuyers.jsx';
 import {
   ChatIcon, ProgressIcon, SavesIcon, PricingIcon,
   LibraryIcon, WinsIcon, SettingsIcon, RefreshIcon, LogoutIcon,
@@ -35,9 +36,6 @@ export default function Sidebar({
   const progressTotal = YBR_STEPS.length;
   const progressPct = progressTotal ? Math.round((activeProjectCount / progressTotal) * 100) : 0;
 
-  // The selected project is driven by the active id, never by list order.
-  const selected = projects.find((p) => p.id === activeProjectId) || null;
-
   const [projectsExpanded, setProjectsExpanded] = useState(true);
 
   return (
@@ -66,37 +64,41 @@ export default function Sidebar({
           )}
         </NavLink>
 
-        {selected && (
-          <div className="nav-progress" title={`${selected.name}: ${activeProjectCount} of ${progressTotal} steps complete`}>
-            <span className="nav-progress-name">{selected.name}</span>
-            <div className="nav-progress-row">
-              <div className="nav-progress-track">
-                <div className="nav-progress-fill" style={{ width: `${progressPct}%` }} />
-              </div>
-              <span className="nav-progress-count">{activeProjectCount}/{progressTotal}</span>
-            </div>
-          </div>
-        )}
-
         {projectsExpanded && projects.length > 0 && (
           <ul className="nav-projects">
-            {projects.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className={'nav-project' + (p.id === activeProjectId ? ' active' : '')}
-                  onClick={() => onSelectProject?.(p)}
-                  title={p.name}
-                >
-                  <span className="nav-project-dot" />
-                  <span className="nav-project-name">{p.name}</span>
-                </button>
-              </li>
-            ))}
+            {projects.map((p) => {
+              const isActive = p.id === activeProjectId;
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={'nav-project' + (isActive ? ' active' : '')}
+                    onClick={() => onSelectProject?.(p)}
+                    title={p.name}
+                  >
+                    <span className="nav-project-dot" />
+                    <span className="nav-project-name">{p.name}</span>
+                  </button>
+                  {isActive && (
+                    <div
+                      className="nav-project-progress"
+                      title={`${p.name}: ${activeProjectCount} of ${progressTotal} steps complete`}
+                    >
+                      <div className="nav-progress-track">
+                        <div className="nav-progress-fill" style={{ width: `${progressPct}%` }} />
+                      </div>
+                      <span className="nav-progress-count">{activeProjectCount}/{progressTotal}</span>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
         <NavItem to="/saves" icon={SavesIcon} label="My Saves" badge={savesCount} />
+
+        <DreamBuyers />
 
         <div className="nav-section-label">Resources</div>
         <NavItem to="/niche-library" icon={LibraryIcon} label="Niche Library" />

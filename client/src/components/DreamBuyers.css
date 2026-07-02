@@ -1,0 +1,116 @@
+/* Sidebar "My Dream Buyers" section + its view/create modals. */
+
+.db-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.db-add {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.db-add:hover { color: var(--green-bright); border-color: var(--green); }
+
+.db-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 12px 6px 12px;
+  line-height: 1.45;
+}
+
+.db-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.db-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 12px 7px 44px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+.db-item:hover { background: var(--card); color: var(--text); }
+.db-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.db-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Modals ---- */
+.db-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1200;
+}
+.db-modal {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  width: min(560px, 100%); max-height: 88vh; display: flex; flex-direction: column;
+  overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.db-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+}
+.db-modal-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); }
+.db-modal-sub { font-size: 12.5px; color: var(--text-muted); }
+.db-x { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 2px 6px; }
+.db-x:hover { color: var(--text); }
+
+.db-modal-body { padding: 18px; overflow-y: auto; font-size: 14px; line-height: 1.6; color: var(--text); }
+.db-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 12px 0 6px; }
+.db-label:first-child { margin-top: 0; }
+.db-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 12px;
+}
+.db-input:focus { outline: none; border-color: var(--green); }
+.db-textarea { resize: vertical; line-height: 1.5; }
+.db-hint { margin: 10px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+
+.db-modal-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; border-top: 1px solid var(--border); background: var(--bg);
+}
+.db-modal-right { display: flex; gap: 10px; }
+.db-btn {
+  padding: 9px 16px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.db-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.db-btn.primary { background: var(--green); border-color: var(--green); color: #06210f; }
+.db-btn.primary:hover { background: var(--green-bright); border-color: var(--green-bright); }
+.db-btn.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.db-btn.danger:hover { color: #ff6b6b; border-color: #ff6b6b; }

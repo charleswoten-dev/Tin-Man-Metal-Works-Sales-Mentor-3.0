@@ -261,7 +261,15 @@ the finished deliverable for step N here, word for word
 
 What goes INSIDE the block is EXACTLY the finalized deliverable you just read back and confirmed — the polished dream buyer description, the offer, the guarantee, the funnel outline, the ad copy, etc. — written tidily in a form they'd want to keep and reuse. It must contain NOTHING before the deliverable (no "here's what we came up with", no lead-in, no recap of how you got there) and NOTHING after it (no encouragement, no "great job", no "check this off", no questions, no intro or transition to the next step). If you wouldn't want it pasted verbatim into a clean document of just that result, it doesn't belong in the block. Use their real details and the same plain shop-owner voice.
 
-The app saves the block's contents into the project's file for that step and HIDES the whole block from the chat — so never mention it, never explain it, and never show it as visible advice. Emit at most one [[STEP_SUMMARY:ybr-N]] block per completed step. If a step doesn't produce a written deliverable worth keeping (it's purely advice or discussion), omit the block entirely — the step still checks off, its slot just stays empty.`;
+The app saves the block's contents into the project's file for that step and HIDES the whole block from the chat — so never mention it, never explain it, and never show it as visible advice. Emit at most one [[STEP_SUMMARY:ybr-N]] block per completed step. If a step doesn't produce a written deliverable worth keeping (it's purely advice or discussion), omit the block entirely — the step still checks off, its slot just stays empty.
+
+SAVING A DREAM BUYER TO THE REUSABLE LIBRARY (IMPORTANT): The app has a "My Dream Buyers" library in the sidebar where the owner keeps reusable dream-buyer avatars they can drop into future projects. When you FINISH building a dream buyer with them — during Step 1 (Find Your Dream Buyer) or Step 7 (Dream Buyer Avatar), once you've drafted and confirmed the full avatar together and they're happy with it — do TWO things:
+1) In your visible message, ask them plainly: "Want to save this dream buyer to your Dream Buyers list so you can reuse it on your next product? Just tap the Save button below."
+2) Append a marker on its own lines at the very END of that same message, in this EXACT format:
+[[DREAM_BUYER:a short memorable name]]
+the full, finalized dream-buyer avatar, word for word
+[[/DREAM_BUYER]]
+The app reads this marker, HIDES it from the chat, and shows a "Save to my Dream Buyers list" button under your message that saves exactly what's inside the block. So never explain the marker, never mention it, and never show it — just put the complete, polished avatar inside it. Give it a short memorable name (e.g. "Backyard Hosts", "Ranchers", "Jeep Owners"). Emit it at most once per finished dream buyer, and only after it's genuinely done. This is separate from [[STEP_SUMMARY:ybr-N]] — for the dream-buyer steps you may emit both.`;
 
 // Pricing coaching — so the mentor can help with quotes conversationally, in
 // the same plain shop-owner voice, even when they're in Chat not the calculator.
@@ -317,6 +325,22 @@ export function buildProfileBlock(profile) {
 
   const lines = fields.map(([k, v]) => `- ${k}: ${v}`).join('\n');
   return `--- USER PROFILE (collected during onboarding — personalize everything to this and never re-ask these) ---\n${lines}`;
+}
+
+// Lists the owner's saved dream buyers so the coach can offer to reuse one at
+// Step 1 of a walkthrough instead of building from scratch. Names only — the
+// full details are dropped into the chat by the app when the owner picks one.
+export function buildDreamBuyersBlock(dreamBuyers) {
+  if (!Array.isArray(dreamBuyers)) return '';
+  const names = dreamBuyers
+    .filter((n) => typeof n === 'string' && n.trim())
+    .map((n) => n.trim());
+  if (names.length === 0) return '';
+  const list = names.map((n) => `- ${n}`).join('\n');
+  return `--- THIS OWNER'S SAVED DREAM BUYERS (reusable avatars) ---
+The owner has saved these dream-buyer avatars they can reuse across projects:
+${list}
+At Step 1 of a walkthrough (Find Your Dream Buyer), OFFER to reuse one of these by name instead of building a new one — e.g. "Want to use one of your saved dream buyers (${names.slice(0, 3).join(', ')}), or build a fresh one for this product?" If they want to use one, tell them to hit "Use in a walkthrough" on that dream buyer in the sidebar (left) — that drops its full details into the chat for you to confirm and continue from. Never invent the contents of a saved dream buyer; only use the details they actually paste in.`;
 }
 
 // Formats the user's saved shop rate into a system block so the mentor can
