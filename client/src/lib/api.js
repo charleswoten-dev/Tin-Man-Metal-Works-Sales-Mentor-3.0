@@ -41,13 +41,27 @@ export async function apiPost(path, body, { retries = 2, backoffMs = 600 } = {})
 // Streaming POST for long generations (product assets). Reads the Server-Sent
 // Events body and calls onText(fullSoFar, delta) as each chunk arrives; resolves
 // with the complete text. Throws on HTTP error or a streamed { error }.
-export async function apiStream(path, body, onText) {
+//
+// `idleMs`: if no bytes (not even the server's keepalive) arrive for this long,
+// the stream is considered dead — abort so the caller's UI can recover instead
+// of spinning forever. The server sends a keepalive every ~15s, so 40s of
+// total silence means the connection is genuinely gone.
+export async function apiStream(path, body, onText, { idleMs = 40000 } = {}) {
+  const controller = new AbortController();
+  let idleTimer;
+  const armIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controller.abort(), idleMs);
+  };
+
   const res = await fetch(`${BASE}/api${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: controller.signal,
   });
   if (!res.ok || !res.body) {
+    clearTimeout(idleTimer);
     let msg = `API ${path} failed: ${res.status}`;
     try {
       const j = await res.json();
@@ -63,28 +77,41 @@ export async function apiStream(path, body, onText) {
   let buf = '';
   let full = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let sep;
-    while ((sep = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, sep);
-      buf = buf.slice(sep + 2);
-      const line = chunk.startsWith('data: ') ? chunk.slice(6) : chunk;
-      if (!line) continue;
-      let payload;
-      try {
-        payload = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (payload.error) throw new Error(payload.error);
-      if (payload.text) {
-        full += payload.text;
-        onText?.(full, payload.text);
+  try {
+    armIdle();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      armIdle(); // any byte (data OR keepalive) means the stream is alive
+      buf += decoder.decode(value, { stream: true });
+      let sep;
+      while ((sep = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        // Ignore SSE comment lines (keepalives start with ':').
+        if (!chunk.startsWith('data: ')) continue;
+        const line = chunk.slice(6);
+        if (!line) continue;
+        let payload;
+        try {
+          payload = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (payload.error) throw new Error(payload.error);
+        if (payload.text) {
+          full += payload.text;
+          onText?.(full, payload.text);
+        }
       }
     }
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error('The response stalled and was cut off. Please try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(idleTimer);
   }
   return full.trim();
 }

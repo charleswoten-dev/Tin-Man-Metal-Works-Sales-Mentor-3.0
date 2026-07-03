@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildProfileBlock, buildShopRateBlock, buildDreamBuyersBlock } from '../lib/systemPrompt.js';
+import { MAX_CONTINUATIONS, CONTINUE_MSG, textOf, generateWithContinuation } from '../lib/continuation.js';
 
 const router = Router();
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
@@ -57,20 +58,16 @@ router.post('/', async (req, res) => {
     if (prep.error) return res.status(prep.status).json({ error: prep.error });
     const { anthropic, system, cleaned, outputTokens } = prep;
 
-    const response = await anthropic.messages.create({
+    // Generate, and if we hit the token ceiling, continue the message so it
+    // finishes (and its trailing markers survive) instead of truncating.
+    const reply = await generateWithContinuation(anthropic, {
       model: MODEL,
       max_tokens: outputTokens,
       system,
       messages: cleaned,
     });
 
-    const reply = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n')
-      .trim();
-
-    res.json({ reply, usage: response.usage });
+    res.json({ reply });
   } catch (err) {
     console.error('Chat error:', err?.status, err?.message || err);
     const status = err?.status && Number.isInteger(err.status) ? err.status : 500;
@@ -94,20 +91,42 @@ router.post('/stream', async (req, res) => {
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
+  // Heartbeat: a comment line every 15s keeps proxies/edges from idle-killing a
+  // slow stream, and lets the client tell "still alive" from "stalled".
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch {
+      /* connection gone */
+    }
+  }, 15000);
+
   try {
-    const stream = anthropic.messages.stream({
-      model: MODEL,
-      max_tokens: outputTokens,
-      system,
-      messages: cleaned,
-    });
-    stream.on('text', (delta) => send({ text: delta }));
-    await stream.finalMessage();
+    let messages = cleaned;
+    for (let round = 0; ; round++) {
+      const stream = anthropic.messages.stream({
+        model: MODEL,
+        max_tokens: outputTokens,
+        system,
+        messages,
+      });
+      stream.on('text', (delta) => send({ text: delta }));
+      const finalMsg = await stream.finalMessage();
+      const part = textOf(finalMsg);
+      // Continue seamlessly if we hit the ceiling — the client just receives
+      // more text deltas.
+      if (finalMsg.stop_reason === 'max_tokens' && part && round < MAX_CONTINUATIONS) {
+        messages = [...messages, { role: 'assistant', content: part }, { role: 'user', content: CONTINUE_MSG }];
+        continue;
+      }
+      break;
+    }
     send({ done: true });
-    res.end();
   } catch (err) {
     console.error('Chat stream error:', err?.status, err?.message || err);
     send({ error: err?.message || 'Chat request failed.' });
+  } finally {
+    clearInterval(heartbeat);
     res.end();
   }
 });

@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { apiPost } from '../lib/api.js';
+import { extractWalkthroughMarkers } from '../lib/walkthroughMarkers.js';
 import { useVoice } from '../lib/useVoice.js';
 import TinManIcon from '../components/TinManIcon.jsx';
 import ProjectTabs from '../components/ProjectTabs.jsx';
@@ -518,8 +519,12 @@ export default function Chat() {
         shopRate: shopRateRef.current,
         dreamBuyers: dreamBuyersRef.current,
         userApiKey: profile?.anthropic_api_key || null,
+        // A walkthrough step's deliverable + its end-of-message markers can run
+        // long; 2048 truncated them (dropping STEP_DONE/STEP_SUMMARY). Give room,
+        // and the server auto-continues if it still hits the ceiling.
+        maxTokens: 4096,
       });
-      const { clean, stepKeys, projectName, summaries, dreamBuyer } = extractStepMarkers(reply);
+      const { clean, stepKeys, projectName, summaries, dreamBuyer } = extractWalkthroughMarkers(reply);
       const botMsg = { role: 'assistant', content: clean, dreamBuyer };
       setMessages((prev) => [...prev, botMsg]);
       // The new bot message lands at index `history.length` (history already
@@ -573,47 +578,8 @@ export default function Chat() {
     });
   }
 
-  // Pull the hidden markers the mentor emits during the guided walkthrough out
-  // of the reply: [[STEP_DONE:ybr-N]] (a step was completed) and
-  // [[PROJECT_NAME:...]] (name for a freshly started project). Returns the
-  // cleaned text with every marker stripped, plus what they carried.
-  function extractStepMarkers(text) {
-    const stepRe = /\[\[STEP_DONE:(ybr-(?:1[0-7]|[1-9]))\]\]/g;
-    const nameRe = /\[\[PROJECT_NAME:([^\]]+)\]\]/g;
-    // A clean, self-contained recap of a step's deliverable, captured and saved
-    // into the project file (and hidden from the chat). [\s\S] so it spans lines.
-    const summaryRe = /\[\[STEP_SUMMARY:(ybr-(?:1[0-7]|[1-9]))\]\]([\s\S]*?)\[\[\/STEP_SUMMARY\]\]/g;
-    // A finished dream-buyer avatar the coach offers to save to the reusable
-    // "My Dream Buyers" library. [\s\S] so the content can span lines.
-    const dbRe = /\[\[DREAM_BUYER:([^\]]+)\]\]([\s\S]*?)\[\[\/DREAM_BUYER\]\]/g;
-    const keys = new Set();
-    let m;
-    while ((m = stepRe.exec(text))) keys.add(m[1]);
-    let projectName = null;
-    let n;
-    while ((n = nameRe.exec(text))) projectName = n[1].trim();
-    const summaries = {};
-    let s;
-    while ((s = summaryRe.exec(text))) {
-      const body = s[2].trim();
-      if (body) summaries[s[1]] = body;
-    }
-    let dreamBuyer = null;
-    let d;
-    while ((d = dbRe.exec(text))) {
-      const name = d[1].trim();
-      const body = d[2].trim();
-      if (name && body) dreamBuyer = { name, content: body };
-    }
-    const clean = text
-      .replace(summaryRe, '') // strip summary blocks before the loose-marker passes
-      .replace(dbRe, '')
-      .replace(stepRe, '')
-      .replace(nameRe, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    return { clean, stepKeys: [...keys], projectName, summaries, dreamBuyer };
-  }
+  // (Walkthrough control-token parsing lives in lib/walkthroughMarkers.js so it
+  // can be unit-tested and stays robust to truncated/partial tokens.)
 
   // Create a project from the name the mentor captured, make it the active
   // walkthrough project, and persist that choice to the profile.

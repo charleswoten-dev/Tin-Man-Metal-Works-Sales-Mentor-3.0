@@ -92,7 +92,13 @@ export default function ProductAssets({ project, steps, shopRate, onSaveAsset, v
       setModal((m) => (m && m.asset.id === asset.id ? { ...m, content, saveState, streaming: false } : m));
     } catch {
       setErrorId(asset.id);
-      setModal(null);
+      // If the stream stalled after writing some copy, keep what came through
+      // (unsaved) so it isn't lost — otherwise close the empty window.
+      setModal((m) =>
+        m && m.asset.id === asset.id && (m.content || '').trim()
+          ? { ...m, streaming: false, saveState: 'unsaved' }
+          : null
+      );
     } finally {
       setBusyId(null);
     }
