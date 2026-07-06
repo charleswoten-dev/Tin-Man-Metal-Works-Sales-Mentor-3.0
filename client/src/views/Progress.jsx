@@ -98,6 +98,18 @@ export default function Progress() {
     window.dispatchEvent(new Event('tinman:projects-changed'));
   }
 
+  // Open a project's chat thread to pick up right where they left off. Sets it
+  // active (the chat thread follows the active project) and jumps to Chat WITHOUT
+  // firing a kickoff — so they land in the existing conversation, ready to
+  // continue or make edits, instead of restarting the walkthrough.
+  async function openProjectChat(id) {
+    if (!id || !user?.id) return;
+    await supabase.from('profiles').update({ active_project_id: id }).eq('id', user.id);
+    refreshProfile?.();
+    window.dispatchEvent(new Event('tinman:projects-changed'));
+    navigate('/chat');
+  }
+
   async function toggle(stepKey) {
     if (!user?.id || saving) return;
     const completed = !done.has(stepKey);
@@ -177,6 +189,7 @@ export default function Progress() {
           selectProject(null);
           setProjects((prev) => prev.filter((p) => p.id !== id));
         }}
+        onOpenChat={() => openProjectChat(openProject.id)}
         onRunWalkthrough={async () => {
           await supabase.from('profiles').update({ active_project_id: openProject.id }).eq('id', user.id);
           refreshProfile?.();
@@ -302,6 +315,14 @@ export default function Progress() {
                         <span className="project-card-count">{c}/{total}</span>
                       </div>
                     </div>
+                    <button
+                      className="project-card-chat"
+                      onClick={(e) => { e.stopPropagation(); openProjectChat(p.id); }}
+                      title={`Open ${p.name}'s chat`}
+                      aria-label={`Open ${p.name}'s chat`}
+                    >
+                      💬 Chat
+                    </button>
                     <span className="project-card-open">Open →</span>
                     <button
                       className="project-card-delete"
@@ -322,7 +343,7 @@ export default function Progress() {
   );
 }
 
-function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProject }) {
+function ProjectDetail({ project, onBack, onDeleted, onOpenChat, onRunWalkthrough, onNewProject }) {
   const { user } = useAuth();
   const total = YBR_STEPS.length;
   const [steps, setSteps] = useState({}); // step_key -> { completed, content, notes }
@@ -442,6 +463,9 @@ function ProjectDetail({ project, onBack, onDeleted, onRunWalkthrough, onNewProj
           <p>Click any step to see or edit what you did for this project.</p>
         </div>
         <div className="project-detail-actions">
+          <button className="project-open-chat-btn" onClick={onOpenChat}>
+            Continue in chat →
+          </button>
           <button className="progress-walkthrough-btn" onClick={onRunWalkthrough}>
             Run the walkthrough for this project
           </button>

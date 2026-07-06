@@ -264,6 +264,19 @@
 .project-card-count { flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--green-bright); min-width: 38px; text-align: right; }
 .project-card-open { flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 .project-card:hover .project-card-open { color: var(--green-bright); }
+.project-card-chat {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--green);
+  background: rgba(0, 200, 83, 0.08);
+  color: var(--green-bright);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.project-card-chat:hover { background: rgba(0, 200, 83, 0.18); }
 .project-card-delete {
   flex-shrink: 0;
   width: 28px;
@@ -282,6 +295,20 @@
 /* ---- Project detail ---- */
 .project-detail-header { align-items: flex-start; }
 .project-detail-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.project-open-chat-btn {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, var(--green), var(--green-bright));
+  color: #04210f;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.project-open-chat-btn:hover { filter: brightness(1.08); }
 .project-back {
   display: inline-block;
   margin-bottom: 8px;
