@@ -46,7 +46,7 @@ export default function Sidebar({
   // Step 1, and the conversation re-homes into its own new project thread. This
   // reuses the exact, tested launch path the Progress page uses.
   const startNewProduct = () => {
-    navigate('/chat', { state: { autosend: WALKTHROUGH_KICKOFF, projectId: null } });
+    navigate('/chat', { state: { autosend: WALKTHROUGH_KICKOFF, projectId: null, fresh: true } });
   };
 
   return (

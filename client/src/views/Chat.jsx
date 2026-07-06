@@ -243,6 +243,10 @@ export default function Chat() {
   // create/adopt one. While locked, the mentor re-announcing the project name
   // at kickoff must NOT spin up a duplicate project.
   const lockedProjectRef = useRef(false);
+  // Set true when "New Product" launches a walkthrough: the next thread load
+  // shows a clean, EMPTY window (skips loading that thread's history) so the new
+  // product starts in a fresh, unused chat instead of on top of prior chat.
+  const freshStartRef = useRef(false);
   // Ids of the messages that currently belong to the General thread (the ones on
   // screen). If a walkthrough started in General adopts/creates a project
   // mid-conversation, these get re-homed into that project so switching into its
@@ -369,6 +373,21 @@ export default function Chat() {
     if (!user?.id) return;
     let cancelled = false;
     setHistoryLoaded(false);
+    // Fresh new-product launch: show a clean, empty window instead of loading
+    // this thread's history. The kickoff we're about to fire is the only thing
+    // shown; the walkthrough re-homes into its own project once it's named.
+    if (freshStartRef.current) {
+      freshStartRef.current = false;
+      setMessages([]);
+      generalMsgIdsRef.current = [];
+      setHistoryLoaded(true);
+      if (pendingSendRef.current) {
+        const text = pendingSendRef.current;
+        pendingSendRef.current = null;
+        send(text, []);
+      }
+      return () => { cancelled = true; };
+    }
     let q = supabase
       .from('messages')
       .select('id, role, content, created_at')
@@ -414,11 +433,15 @@ export default function Chat() {
   useEffect(() => {
     if (!historyLoaded || !location.state?.autosend) return;
     const text = location.state.autosend;
+    // A "New Product" launch asks for a blank window: skip loading the thread's
+    // history so the walkthrough starts in a clean, unused chat.
+    const fresh = Boolean(location.state.fresh);
     const launchProjectId = 'projectId' in location.state ? (location.state.projectId || null) : undefined;
     navigate('.', { replace: true, state: null });
-    // Launching for a specific project: open that project's thread first, then
-    // queue the kickoff to fire once its history finishes loading.
+    // Launching for a specific project (or a fresh product from another thread):
+    // open the target thread first, then fire the kickoff once it settles.
     if (launchProjectId !== undefined && launchProjectId !== threadIdRef.current) {
+      if (fresh) freshStartRef.current = true; // the thread load will blank the window
       pendingSendRef.current = text;
       switchThread(launchProjectId);
       return;
@@ -436,7 +459,15 @@ export default function Chat() {
       // fresh start, which should be free to create/adopt a project by name.
       lockedProjectRef.current = Boolean(launchProjectId);
     }
-    send(text);
+    // Already on the target thread: if this is a fresh launch, blank the window
+    // now and build the kickoff on an empty history (no prior chat bleeds in).
+    if (fresh) {
+      setMessages([]);
+      generalMsgIdsRef.current = [];
+      send(text, []);
+    } else {
+      send(text);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyLoaded, location.state]);
 
