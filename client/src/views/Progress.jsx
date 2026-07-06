@@ -10,7 +10,7 @@ import ProductAssets from '../components/ProductAssets.jsx';
 import './Progress.css';
 
 export default function Progress() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, setActiveProject } = useAuth();
   const activeId = profile?.active_project_id || null;
   const navigate = useNavigate();
   const location = useLocation();
@@ -90,11 +90,10 @@ export default function Progress() {
 
   // Set the active project on the profile — the shared source of truth that the
   // chat thread and this detail view both follow.
-  async function selectProject(id) {
+  function selectProject(id) {
     const next = id || null;
     if (next === activeId || !user?.id) return;
-    await supabase.from('profiles').update({ active_project_id: next }).eq('id', user.id);
-    refreshProfile?.();
+    setActiveProject(next);
     window.dispatchEvent(new Event('tinman:projects-changed'));
   }
 
@@ -102,10 +101,9 @@ export default function Progress() {
   // active (the chat thread follows the active project) and jumps to Chat WITHOUT
   // firing a kickoff — so they land in the existing conversation, ready to
   // continue or make edits, instead of restarting the walkthrough.
-  async function openProjectChat(id) {
+  function openProjectChat(id) {
     if (!id || !user?.id) return;
-    await supabase.from('profiles').update({ active_project_id: id }).eq('id', user.id);
-    refreshProfile?.();
+    setActiveProject(id);
     window.dispatchEvent(new Event('tinman:projects-changed'));
     navigate('/chat');
   }
@@ -190,9 +188,8 @@ export default function Progress() {
           setProjects((prev) => prev.filter((p) => p.id !== id));
         }}
         onOpenChat={() => openProjectChat(openProject.id)}
-        onRunWalkthrough={async () => {
-          await supabase.from('profiles').update({ active_project_id: openProject.id }).eq('id', user.id);
-          refreshProfile?.();
+        onRunWalkthrough={() => {
+          setActiveProject(openProject.id);
           navigate('/chat', {
             state: {
               autosend: walkthroughKickoffForProject(openProject.name),
@@ -201,10 +198,9 @@ export default function Progress() {
             },
           });
         }}
-        onNewProject={async () => {
-          await supabase.from('profiles').update({ active_project_id: null }).eq('id', user.id);
-          refreshProfile?.();
-          navigate('/chat', { state: { autosend: WALKTHROUGH_KICKOFF, projectId: null } });
+        onNewProject={() => {
+          setActiveProject(null);
+          navigate('/chat', { state: { autosend: WALKTHROUGH_KICKOFF, projectId: null, fresh: true } });
         }}
       />
     );

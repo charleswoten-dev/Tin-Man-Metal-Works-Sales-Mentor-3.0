@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase.js';
 import './Layout.css';
 
 export default function Layout() {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, signOut, refreshProfile, setActiveProject } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [savesCount, setSavesCount] = useState(0);
@@ -75,11 +75,10 @@ export default function Layout() {
 
   // Switch the active project from the sidebar: set it active (so the
   // walkthrough saves into it + the slider tracks it) and open its detail view.
-  const handleSelectProject = async (project) => {
+  const handleSelectProject = (project) => {
     if (!user?.id) return;
     setActiveId(project.id); // optimistic — slider/highlight update immediately
-    await supabase.from('profiles').update({ active_project_id: project.id }).eq('id', user.id);
-    refreshProfile?.();
+    setActiveProject(project.id); // serialized write — last click always wins
     navigate('/progress', { state: { openProjectId: project.id } });
   };
 

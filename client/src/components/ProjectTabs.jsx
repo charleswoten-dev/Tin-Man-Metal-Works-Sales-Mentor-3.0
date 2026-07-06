@@ -11,7 +11,7 @@ import './ProjectTabs.css';
 // follow it. The Chat/Progress tabs flip between the two views for that same
 // project without ever touching the sidebar.
 export default function ProjectTabs({ active }) {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, setActiveProject } = useAuth();
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   // Reflect a fresh pick instantly; clear it once the profile refetch catches up.
@@ -38,12 +38,13 @@ export default function ProjectTabs({ active }) {
   }, [user?.id]);
 
   // Set the active project on the profile — the one place every view reads from.
-  async function selectProject(id) {
+  // Routes through the serialized setActiveProject so rapid switches never drift
+  // onto the wrong project.
+  function selectProject(id) {
     const next = id || null;
     if (next === activeId || !user?.id) return;
     setOptimisticId(next);
-    await supabase.from('profiles').update({ active_project_id: next }).eq('id', user.id);
-    refreshProfile?.();
+    setActiveProject(next);
     window.dispatchEvent(new Event('tinman:projects-changed'));
   }
 
