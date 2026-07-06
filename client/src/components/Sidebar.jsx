@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import TinManIcon from './TinManIcon.jsx';
 import InstallApp from './InstallApp.jsx';
 import DreamBuyers from './DreamBuyers.jsx';
 import {
   ChatIcon, ProgressIcon, SavesIcon, PricingIcon,
-  LibraryIcon, WinsIcon, SettingsIcon, RefreshIcon, LogoutIcon,
+  LibraryIcon, WinsIcon, SettingsIcon, RefreshIcon, LogoutIcon, PlusIcon,
 } from './Icons.jsx';
 import { YBR_STEPS } from '../lib/ybrSteps.js';
+import { WALKTHROUGH_KICKOFF } from '../lib/walkthrough.js';
 import './Sidebar.css';
 
 function NavItem({ to, icon: Icon, label, badge }) {
@@ -37,6 +38,16 @@ export default function Sidebar({
   const progressPct = progressTotal ? Math.round((activeProjectCount / progressTotal) * 100) : 0;
 
   const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const navigate = useNavigate();
+
+  // Start a brand-new product from anywhere: jump to Chat and fire the
+  // walkthrough kickoff with no project (projectId: null). The mentor then asks
+  // what to name it, offers to reuse a saved Dream Buyer or build a fresh one at
+  // Step 1, and the conversation re-homes into its own new project thread. This
+  // reuses the exact, tested launch path the Progress page uses.
+  const startNewProduct = () => {
+    navigate('/chat', { state: { autosend: WALKTHROUGH_KICKOFF, projectId: null } });
+  };
 
   return (
     <aside className="sidebar">
@@ -49,6 +60,16 @@ export default function Sidebar({
       </div>
 
       <nav className="sidebar-nav">
+        <button
+          type="button"
+          className="new-product-btn"
+          onClick={startNewProduct}
+          title="Start a new product — I'll walk you through the whole sales system for it"
+        >
+          <PlusIcon className="nav-icon" />
+          <span>New Product</span>
+        </button>
+
         <div className="nav-section-label">Main</div>
         <NavItem to="/chat" icon={ChatIcon} label="Chat" />
 

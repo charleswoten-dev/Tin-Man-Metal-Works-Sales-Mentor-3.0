@@ -25,6 +25,28 @@
 
 /* Nav */
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; padding-top: 8px; }
+
+/* "New Product" primary CTA — starts a fresh product walkthrough from anywhere. */
+.new-product-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  margin-bottom: 6px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--green), var(--green-bright));
+  color: #04210f;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.02s;
+}
+.new-product-btn:hover { filter: brightness(1.08); }
+.new-product-btn:active { transform: translateY(1px); }
+.new-product-btn .nav-icon { color: #04210f; }
 .nav-section-label {
   font-size: 11px;
   text-transform: uppercase;
