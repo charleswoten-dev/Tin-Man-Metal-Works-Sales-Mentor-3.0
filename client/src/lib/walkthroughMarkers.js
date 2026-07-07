@@ -100,9 +100,12 @@ export function inferCompletedSteps(text, hasMarker = false) {
   if (!isWalkthrough) return keys;
 
   let m;
-  // "Step N of 17" header → the mentor is on N, so 1..N-1 are done.
-  const ofRe = /\bstep\s+(\d{1,2})\s+of\s+17\b/gi;
-  while ((m = ofRe.exec(src))) addUpTo(m[1]);
+  // A step header the mentor is delivering — "Step N of 17", "Step N — Title",
+  // or "Step N: Title" → the mentor is on N, so 1..N-1 are done. Requires the
+  // "of 17" / dash / colon right after the number, so a passing "step 2 is…" in
+  // ordinary chat never matches.
+  const headRe = /\bstep\s+(\d{1,2})\s*(?:of\s+17\b|[—–:-])/gi;
+  while ((m = headRe.exec(src))) addUpTo(m[1]);
   // Advancing to Step N ("move/roll/dive/jump/head to/into Step N", "ready for
   // Step N", "next up: Step N") → 1..N-1 are done.
   const fwdRe = /\b(?:move|moving|roll|rolling|jump|jumping|dive|diving|head|heading|onto|on)\s+(?:on\s+|right\s+|straight\s+)?(?:to|into)\s+step\s+(\d{1,2})/gi;

@@ -83,6 +83,18 @@ test('fallback: "Step N, locked in" with a YBR title marks step N', () => {
   assert.ok(keys.has('ybr-6'));
 });
 
+test('fallback: a terse "Step N —" header (no "of 17") still marks earlier steps', () => {
+  const keys = inferCompletedSteps('Step 9 — Write Your Landing Page. Here is the copy built around Wade. Ready?');
+  assert.deepEqual([...keys].sort(), ['ybr-1', 'ybr-2', 'ybr-3', 'ybr-4', 'ybr-5', 'ybr-6', 'ybr-7', 'ybr-8']);
+});
+
+test('safety: a gated message that says "step 2 is…" (no header punctuation) marks nothing extra', () => {
+  // Gated in by the YBR title, but "step 2 is" is not a header, so no over-mark.
+  const keys = inferCompletedSteps('For your landing page, step 2 is to add a testimonial.');
+  assert.ok(!keys.has('ybr-1'));
+  assert.equal(keys.size, 0);
+});
+
 test('fallback: whole-system completion marks all 17', () => {
   const keys = inferCompletedSteps("You finished the full selling system! All 17 steps done.");
   assert.equal(keys.size, 17);
