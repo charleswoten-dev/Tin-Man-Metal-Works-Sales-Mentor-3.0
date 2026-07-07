@@ -47,13 +47,75 @@ export function extractWalkthroughMarkers(text) {
     if (name && body) dreamBuyer = { name, content: body };
   }
 
-  // A finished STEP_SUMMARY for a step ALSO means that step is done, so
-  // completion no longer hinges on the STEP_DONE token surviving truncation.
-  const stepKeys = new Set([...doneKeys, ...Object.keys(summaries)]);
-
   const clean = stripControlTokens(src.replace(summaryRe, '').replace(dbRe, ''));
 
+  // A finished STEP_SUMMARY for a step ALSO means that step is done, so
+  // completion no longer hinges on the STEP_DONE token surviving truncation.
+  // And when the mentor drops BOTH tokens (it sometimes writes a step's
+  // deliverable as plain visible text and forgets the hidden markers, especially
+  // when moving fast), fall back to inferring completion from its own step
+  // language — the walkthrough is strictly sequential, so reaching Step N means
+  // Steps 1..N-1 are done. Never un-marks; only ever adds completions.
+  const inferred = inferCompletedSteps(clean, doneKeys.size > 0 || Object.keys(summaries).length > 0);
+  const stepKeys = new Set([...doneKeys, ...Object.keys(summaries), ...inferred]);
+
   return { clean, stepKeys: [...stepKeys], projectName, summaries, dreamBuyer };
+}
+
+// Distinctive Yellow-Brick-Road step titles — used (with "of 17" / "17-step")
+// to confirm a message is genuinely part of the guided walkthrough before we
+// infer anything from step-number language, so ordinary coaching chat that
+// happens to say "step 2" can never move the user's progress.
+const YBR_TITLES =
+  /\b(yellow brick road|emerald city|wicked witch|ruby slipper|power guarantee|dream buyer avatar|sales funnel|landing page|lead magnet|email (?:follow[- ]?up|sequence)|ad copy|consultative sale|deposit close|handle objections|follow up like a pro|track your numbers|find your dream buyer)\b/i;
+
+// Infer which steps are complete from the mentor's visible text, for messages
+// where the hidden [[STEP_DONE]]/[[STEP_SUMMARY]] markers were dropped.
+export function inferCompletedSteps(text, hasMarker = false) {
+  const src = String(text || '');
+  const keys = new Set();
+  const addUpTo = (n) => {
+    const x = parseInt(n, 10);
+    if (x >= 1 && x <= 18) for (let i = 1; i < x && i <= 17; i++) keys.add(`ybr-${i}`);
+  };
+  const addOne = (n) => {
+    const x = parseInt(n, 10);
+    if (x >= 1 && x <= 17) keys.add(`ybr-${x}`);
+  };
+
+  // Whole-system completion — very specific end-of-walkthrough phrasing, safe to
+  // check on any message (won't match the kickoff's "…all 17 steps, one at a time").
+  if (
+    /finished the full selling system/i.test(src) ||
+    /walked the whole (?:yellow brick )?road/i.test(src) ||
+    /all (?:17|seventeen) steps?[^.!?\n]*\b(?:done|complete|finished|built)\b/i.test(src) ||
+    /you'?ve (?:now )?(?:completed|finished) (?:all )?(?:17|seventeen)\b/i.test(src)
+  ) {
+    for (let i = 1; i <= 17; i++) keys.add(`ybr-${i}`);
+    return keys;
+  }
+
+  // Only mine step numbers from a message that's clearly part of the walkthrough.
+  const isWalkthrough = /\bof\s+17\b/i.test(src) || /\b17[-\s]step\b/i.test(src) || YBR_TITLES.test(src) || hasMarker;
+  if (!isWalkthrough) return keys;
+
+  let m;
+  // "Step N of 17" header → the mentor is on N, so 1..N-1 are done.
+  const ofRe = /\bstep\s+(\d{1,2})\s+of\s+17\b/gi;
+  while ((m = ofRe.exec(src))) addUpTo(m[1]);
+  // Advancing to Step N ("move/roll/dive/jump/head to/into Step N", "ready for
+  // Step N", "next up: Step N") → 1..N-1 are done.
+  const fwdRe = /\b(?:move|moving|roll|rolling|jump|jumping|dive|diving|head|heading|onto|on)\s+(?:on\s+|right\s+|straight\s+)?(?:to|into)\s+step\s+(\d{1,2})/gi;
+  while ((m = fwdRe.exec(src))) addUpTo(m[1]);
+  const readyRe = /\b(?:ready\s+for|next\s+up[:,]?\s*(?:is\s+)?)\s*step\s+(\d{1,2})/gi;
+  while ((m = readyRe.exec(src))) addUpTo(m[1]);
+  // Direct completion of a specific step ("finished Step N", "Step N … locked in").
+  const finRe = /\bfinished\s+step\s+(\d{1,2})/gi;
+  while ((m = finRe.exec(src))) addOne(m[1]);
+  const lockRe = /\bstep\s+(\d{1,2})\b[^\n]{0,28}?(?:locked in|✅|— done|is done|now complete|is complete)/gi;
+  while ((m = lockRe.exec(src))) addOne(m[1]);
+
+  return keys;
 }
 
 // Remove every trace of a control token — complete, loose, or half-emitted —

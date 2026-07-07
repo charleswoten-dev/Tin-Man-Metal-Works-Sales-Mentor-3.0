@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractWalkthroughMarkers } from './walkthroughMarkers.js';
+import { extractWalkthroughMarkers, inferCompletedSteps } from './walkthroughMarkers.js';
 
 test('complete message: strips markers, records step + summary', () => {
   const r = extractWalkthroughMarkers(
@@ -53,4 +53,49 @@ test('safety: ordinary double brackets a user might type are preserved', () => {
   const r = extractWalkthroughMarkers('Put [[your name]] in the greeting.');
   assert.equal(r.clean, 'Put [[your name]] in the greeting.');
   assert.equal(r.stepKeys.length, 0);
+});
+
+// ---- Fallback: infer completion when the mentor drops the hidden markers ----
+
+test('fallback: advancing to Step 7 marks steps 1-6 done (no markers)', () => {
+  const r = extractWalkthroughMarkers(
+    "Boom — your guarantee is locked in.\n\nReady to move into Step 7 — Write Your Dream Buyer Avatar? This is where we document everything."
+  );
+  for (let i = 1; i <= 6; i++) assert.ok(r.stepKeys.includes(`ybr-${i}`), `ybr-${i} should be inferred`);
+  assert.ok(!r.stepKeys.includes('ybr-7'), 'the step being entered is not yet done');
+});
+
+test('fallback: "Step N of 17" header marks all earlier steps', () => {
+  assert.deepEqual(
+    [...inferCompletedSteps('Step 6 of 17 — Craft Your Power Guarantee. This is where...')].sort(),
+    ['ybr-1', 'ybr-2', 'ybr-3', 'ybr-4', 'ybr-5']
+  );
+});
+
+test('fallback: "finished Step N" marks that exact step', () => {
+  const keys = inferCompletedSteps('We just finished Step 2 of 17 — Define Your Emerald City. ✅');
+  assert.ok(keys.has('ybr-1'));
+  assert.ok(keys.has('ybr-2'));
+});
+
+test('fallback: "Step N, locked in" with a YBR title marks step N', () => {
+  const keys = inferCompletedSteps("Here's your Step 6, locked in: the Power Guarantee for your shop.");
+  assert.ok(keys.has('ybr-6'));
+});
+
+test('fallback: whole-system completion marks all 17', () => {
+  const keys = inferCompletedSteps("You finished the full selling system! All 17 steps done.");
+  assert.equal(keys.size, 17);
+});
+
+test('safety: the kickoff ("all 17 steps, one at a time") marks nothing', () => {
+  const keys = inferCompletedSteps(
+    "We're going to build your complete sales system together — all 17 steps — one at a time. Before we dive into Step 1, what should we call this project?"
+  );
+  assert.equal(keys.size, 0);
+});
+
+test('safety: ordinary coaching chat that says "step 2" marks nothing', () => {
+  const keys = inferCompletedSteps('For pricing, step 2 is to add your ~30% labor burden before you quote.');
+  assert.equal(keys.size, 0);
 });
