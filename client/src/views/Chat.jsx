@@ -950,7 +950,10 @@ export default function Chat() {
 
         {messages.map((m, i) => (
           <Message
-            key={i}
+            // Scope the key to the open thread so switching projects remounts the
+            // message rows instead of reusing instances (which leaked an open
+            // save/step menu across threads).
+            key={`${threadId || 'general'}-${i}`}
             role={m.role}
             content={m.content}
             dreamBuyer={m.dreamBuyer}
