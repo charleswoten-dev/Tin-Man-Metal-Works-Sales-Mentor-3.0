@@ -586,11 +586,16 @@ export default function Chat() {
       markStepsComplete(stepKeys, clean, summaries);
       // Content safety net: STEP_SUMMARY blocks get dropped often, which left a
       // step marked done but its section empty. Capture the message into the step
-      // it actually delivered (detected from the message itself, so it can't land
-      // in the wrong section) — only when there's no summary for it AND the
-      // section is still empty, so clean deliverables are never overwritten.
+      // it delivered (detected from the message itself, so it can't land in the
+      // wrong section) — but ONLY when this message actually completed that step
+      // (it's in stepKeys), so we never fill a step that's merely being
+      // introduced. Skipped when a clean summary exists or the section isn't empty.
       const deliveredKey = stepKeyFromMessage(clean);
-      if (deliveredKey && !(summaries[deliveredKey] && summaries[deliveredKey].trim())) {
+      if (
+        deliveredKey &&
+        stepKeys.includes(deliveredKey) &&
+        !(summaries[deliveredKey] && summaries[deliveredKey].trim())
+      ) {
         captureStepContentIfEmpty(deliveredKey, clean);
       }
     } catch (err) {
