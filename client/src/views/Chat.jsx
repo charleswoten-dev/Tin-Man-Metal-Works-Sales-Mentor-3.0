@@ -584,6 +584,15 @@ export default function Chat() {
         await createProjectFromName(projectName);
       }
       markStepsComplete(stepKeys, clean, summaries);
+      // Content safety net: STEP_SUMMARY blocks get dropped often, which left a
+      // step marked done but its section empty. Capture the message into the step
+      // it actually delivered (detected from the message itself, so it can't land
+      // in the wrong section) — only when there's no summary for it AND the
+      // section is still empty, so clean deliverables are never overwritten.
+      const deliveredKey = stepKeyFromMessage(clean);
+      if (deliveredKey && !(summaries[deliveredKey] && summaries[deliveredKey].trim())) {
+        captureStepContentIfEmpty(deliveredKey, clean);
+      }
     } catch (err) {
       setError("The Tin Man couldn't respond just now. Please try again.");
       console.error(err);
@@ -688,6 +697,34 @@ export default function Chat() {
   // Progress view writes to, under the user's own session). If the walkthrough
   // was launched for a project, also save the mentor's output into that
   // project's matching step so the owner can review it later.
+  // Save a step's message into its project section, but only if that section is
+  // still empty — the backstop for when the mentor drops the STEP_SUMMARY block.
+  // Never overwrites an existing (clean) deliverable.
+  async function captureStepContentIfEmpty(stepKey, content) {
+    const projectId = threadIdRef.current || activeProjectRef.current;
+    const body = (content || '').trim();
+    if (!user?.id || !projectId || !stepKey || !body) return;
+    const { data } = await supabase
+      .from('project_steps')
+      .select('content')
+      .eq('project_id', projectId)
+      .eq('step_key', stepKey)
+      .maybeSingle();
+    if (data && data.content && data.content.trim()) return; // keep the existing deliverable
+    const { error } = await supabase.from('project_steps').upsert(
+      {
+        project_id: projectId,
+        user_id: user.id,
+        step_key: stepKey,
+        completed: true,
+        completed_at: new Date().toISOString(),
+        content: body,
+      },
+      { onConflict: 'project_id,step_key' }
+    );
+    if (!error) window.dispatchEvent(new Event('tinman:projects-changed'));
+  }
+
   function markStepsComplete(stepKeys, content, summaries = {}) {
     if (!user?.id || stepKeys.length === 0) return;
     const now = new Date().toISOString();
