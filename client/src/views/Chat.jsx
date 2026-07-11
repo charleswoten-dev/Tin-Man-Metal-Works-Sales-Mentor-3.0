@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { apiPost } from '../lib/api.js';
-import { extractWalkthroughMarkers } from '../lib/walkthroughMarkers.js';
+import { extractWalkthroughMarkers, stepKeyFromMessage } from '../lib/walkthroughMarkers.js';
 import { useVoice } from '../lib/useVoice.js';
 import TinManIcon from '../components/TinManIcon.jsx';
 import ProjectTabs from '../components/ProjectTabs.jsx';
@@ -85,6 +85,20 @@ function MessageActions({ content, onSave, onSaveToStep, projectActive, onReadAl
     }
   }
 
+  // One-click "Save step": auto-detect which step this message is about and save
+  // it there (+ mark it complete). Only when we can't tell do we fall back to the
+  // manual step picker, so a click is never a dead end.
+  function handleSaveStepClick() {
+    const detected = stepKeyFromMessage(content);
+    if (detected) {
+      setMenuOpen(false);
+      handleSaveToStep(detected);
+    } else {
+      setStepMenuOpen((o) => !o);
+      setMenuOpen(false);
+    }
+  }
+
   return (
     <div className="msg-actions">
       <button className="msg-action" onClick={handleCopy} title="Copy to clipboard">
@@ -132,12 +146,12 @@ function MessageActions({ content, onSave, onSaveToStep, projectActive, onReadAl
       {projectActive && (
         <div className="msg-save-wrap">
           <button
-            className="msg-action"
-            onClick={() => { setStepMenuOpen((o) => !o); setMenuOpen(false); }}
-            title="Save to a project step"
+            className="msg-action msg-action-step"
+            onClick={handleSaveStepClick}
+            title="Save this into its walkthrough step"
           >
             {stepSaved ? <CheckIcon width={15} height={15} /> : <BookmarkIcon width={15} height={15} />}
-            <span>{stepSaved ? 'Saved' : 'Save to step'}</span>
+            <span>{stepSaved ? 'Saved' : 'Save step'}</span>
           </button>
           {stepMenuOpen && (
             <div className="msg-save-menu msg-step-menu">

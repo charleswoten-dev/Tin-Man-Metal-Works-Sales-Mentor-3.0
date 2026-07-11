@@ -252,6 +252,9 @@
   transition: color 0.15s, background 0.15s;
 }
 .msg-action:hover { color: var(--text); background: var(--card); }
+/* "Save step" — gold, so it stands out as the walkthrough's save action. */
+.msg-action-step { color: #E0B430; }
+.msg-action-step:hover { color: #F5CE5B; background: rgba(224, 180, 48, 0.14); }
 /* Active "reading aloud" state — accent the button while this message plays. */
 .msg-action.playing { color: var(--green-bright); }
 .msg-action.playing svg { animation: msg-action-pulse 1.4s ease-in-out infinite; }

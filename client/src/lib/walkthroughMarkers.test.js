@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractWalkthroughMarkers, inferCompletedSteps } from './walkthroughMarkers.js';
+import { extractWalkthroughMarkers, inferCompletedSteps, stepKeyFromMessage } from './walkthroughMarkers.js';
 
 test('complete message: strips markers, records step + summary', () => {
   const r = extractWalkthroughMarkers(
@@ -93,6 +93,25 @@ test('safety: a gated message that says "step 2 is…" (no header punctuation) m
   const keys = inferCompletedSteps('For your landing page, step 2 is to add a testimonial.');
   assert.ok(!keys.has('ybr-1'));
   assert.equal(keys.size, 0);
+});
+
+test('stepKeyFromMessage: "Step N of 17" header wins, even when a next step is mentioned', () => {
+  assert.equal(
+    stepKeyFromMessage('Step 6 of 17 — Craft Your Power Guarantee. Here it is. Ready to move into Step 7?'),
+    'ybr-6'
+  );
+});
+
+test('stepKeyFromMessage: "Step N, locked in" is detected', () => {
+  assert.equal(stepKeyFromMessage("Here's your Step 9, locked in: the landing page copy."), 'ybr-9');
+});
+
+test('stepKeyFromMessage: falls back to the first "Step N —" header', () => {
+  assert.equal(stepKeyFromMessage('Step 12 — Write Your Ad Copy. Here are two ads for you.'), 'ybr-12');
+});
+
+test('stepKeyFromMessage: returns null when no step is identifiable', () => {
+  assert.equal(stepKeyFromMessage('Here is a great Facebook ad for your shop.'), null);
 });
 
 test('fallback: whole-system completion marks all 17', () => {

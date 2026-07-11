@@ -121,6 +121,30 @@ export function inferCompletedSteps(text, hasMarker = false) {
   return keys;
 }
 
+// Which single step a message is ABOUT, for the one-click "Save step" button —
+// so clicking it files that message into the right step without a picker. Prefers
+// the "Step N of 17" header the mentor gives the step it's delivering; falls back
+// to a completion cue, then the first "Step N —/:" header in the message. Returns
+// a ybr key ('ybr-6') or null when no step can be confidently identified (then the
+// UI falls back to the manual picker).
+export function stepKeyFromMessage(text) {
+  const src = String(text || '');
+  const ok = (n) => {
+    const x = parseInt(n, 10);
+    return x >= 1 && x <= 17 ? `ybr-${x}` : null;
+  };
+  let m;
+  m = src.match(/\bstep\s+(\d{1,2})\s+of\s+17\b/i);
+  if (m && ok(m[1])) return ok(m[1]);
+  m = src.match(/\bfinished\s+step\s+(\d{1,2})/i);
+  if (m && ok(m[1])) return ok(m[1]);
+  m = src.match(/\bstep\s+(\d{1,2})\b[^\n]{0,28}?(?:locked in|✅|— done|is done|now complete|is complete)/i);
+  if (m && ok(m[1])) return ok(m[1]);
+  m = src.match(/\bstep\s+(\d{1,2})\s*[—–:-]/i);
+  if (m && ok(m[1])) return ok(m[1]);
+  return null;
+}
+
 // Remove every trace of a control token — complete, loose, or half-emitted —
 // so nothing like "[[STEP_SUMMARY:ybr-1] …" ever renders. Only known control
 // tokens are targeted, never arbitrary bracketed text a user might type.
