@@ -57,14 +57,6 @@ test('safety: ordinary double brackets a user might type are preserved', () => {
 
 // ---- Fallback: infer completion when the mentor drops the hidden markers ----
 
-test('fallback: advancing to Step 7 marks steps 1-6 done (no markers)', () => {
-  const r = extractWalkthroughMarkers(
-    "Boom — your guarantee is locked in.\n\nReady to move into Step 7 — Write Your Dream Buyer Avatar? This is where we document everything."
-  );
-  for (let i = 1; i <= 6; i++) assert.ok(r.stepKeys.includes(`ybr-${i}`), `ybr-${i} should be inferred`);
-  assert.ok(!r.stepKeys.includes('ybr-7'), 'the step being entered is not yet done');
-});
-
 test('fallback: "Step N of 17" header marks all earlier steps', () => {
   assert.deepEqual(
     [...inferCompletedSteps('Step 6 of 17 — Craft Your Power Guarantee. This is where...')].sort(),
@@ -72,26 +64,26 @@ test('fallback: "Step N of 17" header marks all earlier steps', () => {
   );
 });
 
-test('fallback: "finished Step N" marks that exact step', () => {
-  const keys = inferCompletedSteps('We just finished Step 2 of 17 — Define Your Emerald City. ✅');
+test('fallback: "Step N of 17" marks 1..N-1 (the current step is not yet done)', () => {
+  const keys = inferCompletedSteps('Step 2 of 17 — Define Your Emerald City. Let me ask you this…');
   assert.ok(keys.has('ybr-1'));
-  assert.ok(keys.has('ybr-2'));
+  assert.ok(!keys.has('ybr-2'), 'the step being introduced is not marked done yet');
 });
 
-test('fallback: "Step N, locked in" with a YBR title marks step N', () => {
-  const keys = inferCompletedSteps("Here's your Step 6, locked in: the Power Guarantee for your shop.");
-  assert.ok(keys.has('ybr-6'));
+// BUG A regression: the mentor writes numbered lists like "Step 1… Step 5" INSIDE
+// a deliverable (the buyer's journey in Step 3). Those must NEVER be read as
+// walkthrough steps — that used to mark steps done before the user reached them.
+test('content-immune: numbered "Step N —/:" mentions inside a deliverable mark nothing', () => {
+  const journey =
+    "Here's his Yellow Brick Road:\n\nStep 1 — He sees it while scrolling.\n" +
+    "Step 2 — He clicks and reads reviews.\nStep 3: The doubt creeps in.\n" +
+    "Step 4 — He hesitates on price.\nStep 5 — The Pull: he buys.";
+  assert.equal(inferCompletedSteps(journey).size, 0);
+  assert.equal(stepKeyFromMessage(journey), null);
 });
 
-test('fallback: a terse "Step N —" header (no "of 17") still marks earlier steps', () => {
-  const keys = inferCompletedSteps('Step 9 — Write Your Landing Page. Here is the copy built around Wade. Ready?');
-  assert.deepEqual([...keys].sort(), ['ybr-1', 'ybr-2', 'ybr-3', 'ybr-4', 'ybr-5', 'ybr-6', 'ybr-7', 'ybr-8']);
-});
-
-test('safety: a gated message that says "step 2 is…" (no header punctuation) marks nothing extra', () => {
-  // Gated in by the YBR title, but "step 2 is" is not a header, so no over-mark.
+test('safety: a message that says "step 2 is…" marks nothing', () => {
   const keys = inferCompletedSteps('For your landing page, step 2 is to add a testimonial.');
-  assert.ok(!keys.has('ybr-1'));
   assert.equal(keys.size, 0);
 });
 
@@ -102,16 +94,9 @@ test('stepKeyFromMessage: "Step N of 17" header wins, even when a next step is m
   );
 });
 
-test('stepKeyFromMessage: "Step N, locked in" is detected', () => {
-  assert.equal(stepKeyFromMessage("Here's your Step 9, locked in: the landing page copy."), 'ybr-9');
-});
-
-test('stepKeyFromMessage: falls back to the first "Step N —" header', () => {
-  assert.equal(stepKeyFromMessage('Step 12 — Write Your Ad Copy. Here are two ads for you.'), 'ybr-12');
-});
-
-test('stepKeyFromMessage: returns null when no step is identifiable', () => {
+test('stepKeyFromMessage: returns null without a "Step N of 17" header', () => {
   assert.equal(stepKeyFromMessage('Here is a great Facebook ad for your shop.'), null);
+  assert.equal(stepKeyFromMessage('Step 12 — Write Your Ad Copy. Here are two ads for you.'), null);
 });
 
 test('fallback: whole-system completion marks all 17', () => {
