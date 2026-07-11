@@ -70,6 +70,11 @@ test('fallback: "Step N of 17" marks 1..N-1 (the current step is not yet done)',
   assert.ok(!keys.has('ybr-2'), 'the step being introduced is not marked done yet');
 });
 
+test('fallback: a real "Step N — <YBR title>" header (no "of 17") marks earlier steps', () => {
+  const keys = inferCompletedSteps("Step 4 — Identify Their Wicked Witch. Now let's dig into Pete's fears.");
+  assert.deepEqual([...keys].sort(), ['ybr-1', 'ybr-2', 'ybr-3']);
+});
+
 // BUG A regression: the mentor writes numbered lists like "Step 1… Step 5" INSIDE
 // a deliverable (the buyer's journey in Step 3). Those must NEVER be read as
 // walkthrough steps — that used to mark steps done before the user reached them.
@@ -94,9 +99,14 @@ test('stepKeyFromMessage: "Step N of 17" header wins, even when a next step is m
   );
 });
 
-test('stepKeyFromMessage: returns null without a "Step N of 17" header', () => {
+test('stepKeyFromMessage: a real "Step N — <YBR title>" header is detected', () => {
+  assert.equal(stepKeyFromMessage('Step 12 — Write Your Ad Copy. Here are two ads for you.'), 'ybr-12');
+});
+
+test('stepKeyFromMessage: returns null without a real step header', () => {
   assert.equal(stepKeyFromMessage('Here is a great Facebook ad for your shop.'), null);
-  assert.equal(stepKeyFromMessage('Step 12 — Write Your Ad Copy. Here are two ads for you.'), null);
+  // A numbered process line inside a deliverable is NOT a step header.
+  assert.equal(stepKeyFromMessage('Step 4 — he hesitates on the price for a minute.'), null);
 });
 
 test('fallback: whole-system completion marks all 17', () => {

@@ -62,15 +62,31 @@ export function extractWalkthroughMarkers(text) {
   return { clean, stepKeys: [...stepKeys], projectName, summaries, dreamBuyer };
 }
 
+// The 17 canonical Yellow-Brick-Road step titles. The mentor's REAL step headers
+// always pair the number with one of these ("Step 4 — Identify Their Wicked
+// Witch"). Numbered list items the mentor writes INSIDE a deliverable (the
+// buyer's journey "Step 4 — He hesitates") never carry a YBR title, so requiring
+// one makes step detection immune to that content.
+const YBR_TITLE =
+  /(find your dream buyer|emerald city|yellow brick road|wicked witch|ruby slipper|power guarantee|dream buyer avatar|sales funnel|landing page|lead magnet|email (?:follow[- ]?up|sequence)|ad copy|consultative sale|deposit close|handle objections|follow up like a pro|track your numbers)/i;
+
+// A walkthrough step header: "Step N of 17" OR "Step N — <a YBR title>". Both are
+// things only the mentor's own headers produce; a numbered process/list inside a
+// deliverable matches neither. Returns [ [n, matchText], … ].
+function stepHeaders(src) {
+  const out = [];
+  let m;
+  const ofRe = /\bstep\s+(\d{1,2})\s+of\s+17\b/gi;
+  while ((m = ofRe.exec(src))) out.push([parseInt(m[1], 10), m[0]]);
+  const titleRe = /\bstep\s+(\d{1,2})\s*[—–:-][^\n]{0,45}/gi;
+  while ((m = titleRe.exec(src))) if (YBR_TITLE.test(m[0])) out.push([parseInt(m[1], 10), m[0]]);
+  return out;
+}
+
 // Infer which steps are complete from the mentor's visible text, for messages
-// where the hidden [[STEP_DONE]]/[[STEP_SUMMARY]] markers were dropped.
-//
-// CONTENT-IMMUNE: we only ever trust the mentor's own canonical header, which is
-// ALWAYS "Step N of 17". Bare "Step N" / "Step N — …" mentions are ignored,
-// because the mentor writes numbered lists like "Step 1… Step 5" INSIDE a
-// deliverable (e.g. the buyer's journey in Step 3), and reading those as
-// walkthrough steps used to mark steps complete before the user reached them.
-// Reaching "Step N of 17" means the mentor is on N, so Steps 1..N-1 are done.
+// where the hidden [[STEP_DONE]]/[[STEP_SUMMARY]] markers were dropped. Trusts
+// only real step headers (see stepHeaders) — reaching Step N means Steps 1..N-1
+// are done. Content-immune: numbered lists inside a deliverable can't fool it.
 export function inferCompletedSteps(text) {
   const src = String(text || '');
   const keys = new Set();
@@ -87,25 +103,21 @@ export function inferCompletedSteps(text) {
     return keys;
   }
 
-  // The ONLY step-number signal we trust: "Step N of 17".
-  let m;
-  const ofRe = /\bstep\s+(\d{1,2})\s+of\s+17\b/gi;
-  while ((m = ofRe.exec(src))) {
-    const n = parseInt(m[1], 10);
+  for (const [n] of stepHeaders(src)) {
     if (n >= 1 && n <= 18) for (let i = 1; i < n && i <= 17; i++) keys.add(`ybr-${i}`);
   }
   return keys;
 }
 
 // Which single step a message is ABOUT, for the one-click "Save step" button and
-// the content safety net. Only trusts the mentor's canonical "Step N of 17"
-// header (content-immune — a numbered list inside a deliverable can't fool it).
+// the content safety net. Uses the FIRST real step header (the step the message
+// is delivering, which appears before any "next step" mention). Content-immune.
 // Returns a ybr key ('ybr-6') or null; when null the Save-step UI falls back to
 // the manual picker and the safety net simply doesn't auto-capture.
 export function stepKeyFromMessage(text) {
-  const m = String(text || '').match(/\bstep\s+(\d{1,2})\s+of\s+17\b/i);
-  if (!m) return null;
-  const x = parseInt(m[1], 10);
+  const headers = stepHeaders(String(text || ''));
+  if (!headers.length) return null;
+  const x = headers[0][0];
   return x >= 1 && x <= 17 ? `ybr-${x}` : null;
 }
 
