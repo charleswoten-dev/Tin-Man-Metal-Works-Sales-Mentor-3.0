@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractWalkthroughMarkers, inferCompletedSteps, stepKeyFromMessage } from './walkthroughMarkers.js';
+import {
+  extractWalkthroughMarkers,
+  inferCompletedSteps,
+  stepKeyFromMessage,
+  stepHeaderNumbers,
+} from './walkthroughMarkers.js';
 
 test('complete message: strips markers, records step + summary', () => {
   const r = extractWalkthroughMarkers(
@@ -124,4 +129,28 @@ test('safety: the kickoff ("all 17 steps, one at a time") marks nothing', () => 
 test('safety: ordinary coaching chat that says "step 2" marks nothing', () => {
   const keys = inferCompletedSteps('For pricing, step 2 is to add your ~30% labor burden before you quote.');
   assert.equal(keys.size, 0);
+});
+
+// ---- stepHeaderNumbers: powers the advance-based content backstop ----
+
+test('stepHeaderNumbers: reads a real "Step N — <title>" header', () => {
+  assert.deepEqual(stepHeaderNumbers('Step 9 — Build Your Landing Page. Tell me about your brand.'), [9]);
+});
+
+test('stepHeaderNumbers: reads a "Step N of 17" header', () => {
+  assert.deepEqual(stepHeaderNumbers('Step 6 of 17 — Craft Your Power Guarantee. Here it is.'), [6]);
+});
+
+test('stepHeaderNumbers: a plain deliverable (no header) yields nothing → no false advance', () => {
+  assert.deepEqual(stepHeaderNumbers("Here's your full sales funnel:\n1. Ad\n2. Landing page\n3. Email"), []);
+});
+
+test('stepHeaderNumbers: content-immune to numbered "Step N —" lines inside a deliverable', () => {
+  const journey = 'His journey:\nStep 1 — He scrolls.\nStep 2 — He clicks.\nStep 3 — He buys.';
+  assert.deepEqual(stepHeaderNumbers(journey), []);
+});
+
+test('stepHeaderNumbers: when a message intros the next step, its number is the max', () => {
+  const msg = 'Locked in. Now Step 10 — Create Your Lead Magnet. What could you give away?';
+  assert.equal(Math.max(...stepHeaderNumbers(msg)), 10);
 });

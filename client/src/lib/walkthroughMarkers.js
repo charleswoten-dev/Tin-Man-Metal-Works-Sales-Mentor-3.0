@@ -83,6 +83,14 @@ function stepHeaders(src) {
   return out;
 }
 
+// The step numbers of every real header in a message (see stepHeaders), highest
+// first. Used to tell when the mentor has ADVANCED to a new step.
+export function stepHeaderNumbers(text) {
+  return stepHeaders(String(text || ''))
+    .map(([n]) => n)
+    .filter((n) => n >= 1 && n <= 17);
+}
+
 // Infer which steps are complete from the mentor's visible text, for messages
 // where the hidden [[STEP_DONE]]/[[STEP_SUMMARY]] markers were dropped. Trusts
 // only real step headers (see stepHeaders) — reaching Step N means Steps 1..N-1
