@@ -47,7 +47,7 @@ export function extractWalkthroughMarkers(text) {
     if (name && body) dreamBuyer = { name, content: body };
   }
 
-  const clean = stripControlTokens(src.replace(summaryRe, '').replace(dbRe, ''));
+  const clean = cleanForDisplay(src);
 
   // A finished STEP_SUMMARY for a step ALSO means that step is done, so
   // completion no longer hinges on the STEP_DONE token surviving truncation.
@@ -127,6 +127,18 @@ export function stepKeyFromMessage(text) {
   if (!headers.length) return null;
   const x = headers[0][0];
   return x >= 1 && x <= 17 ? `ybr-${x}` : null;
+}
+
+// The display-safe text of a message that may still be mid-stream: the finalized
+// STEP_SUMMARY / DREAM_BUYER blocks removed and every control token — whole,
+// loose, or half-emitted — stripped. Used both for the final render and to reveal
+// a reply live as it streams in, so a fragment like "[[STEP_SUMMARY:ybr-1]" never
+// flashes on screen while the Tin Man is still writing.
+export function cleanForDisplay(text) {
+  const src = String(text || '');
+  const summaryRe = new RegExp(`\\[\\[STEP_SUMMARY:(${STEP})\\]\\]([\\s\\S]*?)\\[\\[\\/STEP_SUMMARY\\]\\]`, 'g');
+  const dbRe = /\[\[DREAM_BUYER:([^\]\n]+)\]\]([\s\S]*?)\[\[\/DREAM_BUYER\]\]/g;
+  return stripControlTokens(src.replace(summaryRe, '').replace(dbRe, ''));
 }
 
 // Remove every trace of a control token — complete, loose, or half-emitted —

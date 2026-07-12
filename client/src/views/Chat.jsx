@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
-import { apiPost } from '../lib/api.js';
-import { extractWalkthroughMarkers, stepKeyFromMessage, stepHeaderNumbers } from '../lib/walkthroughMarkers.js';
+import { apiStream } from '../lib/api.js';
+import { extractWalkthroughMarkers, cleanForDisplay, stepKeyFromMessage, stepHeaderNumbers } from '../lib/walkthroughMarkers.js';
 import { useVoice } from '../lib/useVoice.js';
 import TinManIcon from '../components/TinManIcon.jsx';
 import ProjectTabs from '../components/ProjectTabs.jsx';
@@ -35,6 +35,24 @@ function TypingIndicator() {
         <span className="dot" />
         <span className="dot" />
         <span className="dot" />
+      </div>
+    </div>
+  );
+}
+
+// The live bubble shown while a reply streams in: the text-so-far plus a blinking
+// caret. No action buttons — those appear once the finalized message lands.
+function StreamingMessage({ content }) {
+  return (
+    <div className="msg-row bot">
+      <TinManIcon size={34} className="msg-avatar" />
+      <div className="msg-col">
+        <div className="msg-bubble bot">
+          <div className="md">
+            <ReactMarkdown>{content}</ReactMarkdown>
+            <span className="stream-caret" aria-hidden="true" />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -222,6 +240,10 @@ export default function Chat() {
   const location = useLocation();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
+  // While a reply streams in, the display-cleaned text-so-far (null = not
+  // streaming). Rendered as a live bubble with a blinking caret so the Tin Man
+  // writes line-by-line instead of dumping the whole reply after a long wait.
+  const [streamingText, setStreamingText] = useState(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -455,6 +477,15 @@ export default function Chat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
+  // Keep the view pinned to the bottom as a reply streams in. Instant (not
+  // smooth) so it tracks the growing text without queuing a jerky animation per
+  // chunk.
+  useEffect(() => {
+    if (streamingText !== null) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+  }, [streamingText]);
+
   // Prefill the input when arriving from the Niche Library, then clear the
   // navigation state so it doesn't re-fire on back/refresh.
   useEffect(() => {
@@ -581,20 +612,35 @@ export default function Chat() {
     const userPersist = persistMessage('user', content);
 
     try {
-      const { reply } = await apiPost('/chat', {
-        messages: history,
-        profile: profileForApi(),
-        shopRate: shopRateRef.current,
-        dreamBuyers: dreamBuyersRef.current,
-        userApiKey: profile?.anthropic_api_key || null,
-        // A walkthrough step's deliverable + its end-of-message markers can run
-        // long; 2048 truncated them (dropping STEP_DONE/STEP_SUMMARY). Give room,
-        // and the server auto-continues if it still hits the ceiling.
-        maxTokens: 4096,
-      });
+      // Stream the reply so it writes on screen line-by-line as the Tin Man
+      // generates it, instead of popping in all at once after a long blank wait.
+      // The typing dots show until the first token; then a live bubble takes over.
+      // Hidden control tokens are stripped on the fly so they never flash on screen.
+      let sawFirstChunk = false;
+      const reply = await apiStream(
+        '/chat/stream',
+        {
+          messages: history,
+          profile: profileForApi(),
+          shopRate: shopRateRef.current,
+          dreamBuyers: dreamBuyersRef.current,
+          userApiKey: profile?.anthropic_api_key || null,
+          // A walkthrough step's deliverable + its end-of-message markers can run
+          // long; 2048 truncated them (dropping STEP_DONE/STEP_SUMMARY). Give room,
+          // and the server auto-continues if it still hits the ceiling.
+          maxTokens: 4096,
+        },
+        (full) => {
+          if (!sawFirstChunk) { sawFirstChunk = true; setSending(false); }
+          setStreamingText(cleanForDisplay(full));
+        }
+      );
       const { clean, stepKeys, projectName, summaries, dreamBuyer } = extractWalkthroughMarkers(reply);
+      // Swap the live streaming bubble for the finalized message in one batched
+      // update so there's no flicker between the two.
       const botMsg = { role: 'assistant', content: clean, dreamBuyer };
       setMessages((prev) => [...prev, botMsg]);
+      setStreamingText(null);
       // The new bot message lands at index `history.length` (history already
       // includes the user turn). Highlight it if we auto-read.
       if (voiceOut && clean) { speak(clean); setPlayingIdx(history.length); }
@@ -632,6 +678,8 @@ export default function Chat() {
       }
       prevReplyRef.current = clean;
     } catch (err) {
+      // Drop the partial streaming bubble; the user's message stays so they can resend.
+      setStreamingText(null);
       setError("The Tin Man couldn't respond just now. Please try again.");
       console.error(err);
     } finally {
@@ -1042,7 +1090,11 @@ export default function Chat() {
           />
         ))}
 
-        {sending && <TypingIndicator />}
+        {streamingText !== null ? (
+          <StreamingMessage content={streamingText} />
+        ) : (
+          sending && <TypingIndicator />
+        )}
       </div>
 
       {savedToast && (
