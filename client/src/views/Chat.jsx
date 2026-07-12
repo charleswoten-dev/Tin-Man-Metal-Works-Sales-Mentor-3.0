@@ -614,9 +614,12 @@ export default function Chat() {
     try {
       // Stream the reply so it writes on screen line-by-line as the Tin Man
       // generates it, instead of popping in all at once after a long blank wait.
-      // The typing dots show until the first token; then a live bubble takes over.
-      // Hidden control tokens are stripped on the fly so they never flash on screen.
-      let sawFirstChunk = false;
+      // The typing dots show until the first token; once text arrives the live
+      // bubble takes over (the render prefers streamingText over the dots).
+      // `sending` deliberately stays true for the whole request so the input and
+      // send button stay disabled — otherwise a message fired mid-stream would
+      // launch a second concurrent send(). Hidden control tokens are stripped on
+      // the fly so they never flash on screen.
       const reply = await apiStream(
         '/chat/stream',
         {
@@ -630,10 +633,7 @@ export default function Chat() {
           // and the server auto-continues if it still hits the ceiling.
           maxTokens: 4096,
         },
-        (full) => {
-          if (!sawFirstChunk) { sawFirstChunk = true; setSending(false); }
-          setStreamingText(cleanForDisplay(full));
-        }
+        (full) => setStreamingText(cleanForDisplay(full))
       );
       const { clean, stepKeys, projectName, summaries, dreamBuyer } = extractWalkthroughMarkers(reply);
       // Swap the live streaming bubble for the finalized message in one batched
