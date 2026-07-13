@@ -100,11 +100,14 @@ export function inferCompletedSteps(text) {
   const keys = new Set();
 
   // Whole-system completion — specific end-of-walkthrough phrasing (won't match
-  // the kickoff's "…all 17 steps, one at a time"). Covers the final step 17.
+  // the kickoff's "…all 17 steps, one at a time", nor a forward-looking promise
+  // like "by the end you'll have all 17 steps built"). The steps must be the
+  // SUBJECT of a present/past completion state ("all 17 steps are done", "…have
+  // been built"), never a bare future "…steps built". Covers the final step 17.
   if (
     /finished the full selling system/i.test(src) ||
     /walked the whole (?:yellow brick )?road/i.test(src) ||
-    /all (?:17|seventeen) steps?[^.!?\n]*\b(?:done|complete|finished|built)\b/i.test(src) ||
+    /all (?:17|seventeen) steps?\s+(?:are|were|have been)\s+(?:now\s+)?(?:done|complete|finished|built)\b/i.test(src) ||
     /you'?ve (?:now )?(?:completed|finished) (?:all )?(?:17|seventeen)\b/i.test(src)
   ) {
     for (let i = 1; i <= 17; i++) keys.add(`ybr-${i}`);

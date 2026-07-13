@@ -141,6 +141,25 @@ test('safety: the kickoff ("all 17 steps, one at a time") marks nothing', () => 
   assert.equal(keys.size, 0);
 });
 
+// Regression: a FORWARD-LOOKING promise at the kickoff ("by the time we're done
+// you'll have all 17 steps built") must NOT be read as completion — that used to
+// mark all 17 done on the very first reply and jump the counter to 17/17.
+test('safety: a future-tense "you\'ll have all 17 steps built" marks nothing', () => {
+  assert.equal(
+    inferCompletedSteps("By the time we're done, you'll have all 17 steps built for your shop.").size,
+    0
+  );
+  assert.equal(
+    inferCompletedSteps('We finished Step 1 — now we can start building all 17 steps together.').size,
+    0
+  );
+});
+
+test('whole-system completion still fires on genuine "all 17 steps are done"', () => {
+  assert.equal(inferCompletedSteps('That was the last one — all 17 steps are done!').size, 17);
+  assert.equal(inferCompletedSteps('All 17 steps have been built. Congratulations!').size, 17);
+});
+
 test('safety: ordinary coaching chat that says "step 2" marks nothing', () => {
   const keys = inferCompletedSteps('For pricing, step 2 is to add your ~30% labor burden before you quote.');
   assert.equal(keys.size, 0);
