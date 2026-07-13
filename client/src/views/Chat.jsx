@@ -1032,6 +1032,15 @@ export default function Chat() {
       {error && <div className="chat-error">{error}</div>}
 
       <div className="chat-input-bar">
+        <textarea
+          className="chat-input"
+          rows={1}
+          placeholder={listening ? 'Listening…' : 'Message the Tin Man…'}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={sending}
+        />
         {recognitionSupported && (
           <button
             className={'chat-mic' + (listening ? ' listening' : '')}
@@ -1044,15 +1053,6 @@ export default function Chat() {
             <MicIcon />
           </button>
         )}
-        <textarea
-          className="chat-input"
-          rows={1}
-          placeholder={listening ? 'Listening…' : 'Message the Tin Man…'}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={sending}
-        />
         <button
           className="chat-send"
           onClick={() => send(input)}
