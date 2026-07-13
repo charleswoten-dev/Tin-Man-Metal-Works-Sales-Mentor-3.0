@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { apiStream } from '../lib/api.js';
-import { extractWalkthroughMarkers, cleanForDisplay, stepKeyFromMessage, stepHeaderNumbers } from '../lib/walkthroughMarkers.js';
+import { extractWalkthroughMarkers, cleanForDisplay, stepKeyFromMessage } from '../lib/walkthroughMarkers.js';
 import { useVoice } from '../lib/useVoice.js';
 import TinManIcon from '../components/TinManIcon.jsx';
 import ProjectTabs from '../components/ProjectTabs.jsx';
@@ -283,15 +283,6 @@ export default function Chat() {
   // shows a clean, EMPTY window (skips loading that thread's history) so the new
   // product starts in a fresh, unused chat instead of on top of prior chat.
   const freshStartRef = useRef(false);
-  // Advance-based content backstop: the highest walkthrough step the mentor has
-  // reached so far, and the previous assistant reply. When the mentor moves to a
-  // new step, the step it just left is finished, and the reply BEFORE the
-  // transition is that step's finalized deliverable — file it into the section
-  // (only if empty, so a clean STEP_SUMMARY always wins). This is what fills the
-  // written steps (funnel, landing page, emails, ads) on long runs where the
-  // mentor stops emitting the hidden STEP_SUMMARY marker.
-  const curStepRef = useRef(0);
-  const prevReplyRef = useRef('');
   // Ids of the messages that currently belong to the General thread (the ones on
   // screen). If a walkthrough started in General adopts/creates a project
   // mid-conversation, these get re-homed into that project so switching into its
@@ -425,8 +416,6 @@ export default function Chat() {
       freshStartRef.current = false;
       setMessages([]);
       generalMsgIdsRef.current = [];
-      curStepRef.current = 0;
-      prevReplyRef.current = '';
       setHistoryLoaded(true);
       if (pendingSendRef.current) {
         const text = pendingSendRef.current;
@@ -444,18 +433,6 @@ export default function Chat() {
       if (cancelled) return;
       const loaded = data ? data.map((m) => ({ role: m.role, content: m.content })) : [];
       setMessages(loaded);
-      // Re-seed the advance-based content backstop from this thread's history so
-      // resuming a project picks up where it left off (no re-capturing step 1).
-      let maxStep = 0;
-      let lastAssistant = '';
-      for (const m of loaded) {
-        if (m.role !== 'assistant') continue;
-        lastAssistant = m.content;
-        const nums = stepHeaderNumbers(m.content);
-        if (nums.length) maxStep = Math.max(maxStep, ...nums);
-      }
-      curStepRef.current = maxStep;
-      prevReplyRef.current = lastAssistant;
       // Start tracking General-thread messages fresh on every thread load. Only
       // messages sent AFTER this point (i.e. the walkthrough we're about to run)
       // get re-homed if a project is adopted — pre-existing General chat stays in
@@ -653,30 +630,6 @@ export default function Chat() {
         await createProjectFromName(projectName);
       }
       markStepsComplete(stepKeys, clean, summaries);
-      // Content backstop (advance-based). STEP_SUMMARY blocks get dropped on long
-      // runs, leaving a step marked done but its section empty. When the mentor
-      // ADVANCES to a new step, the step it just left is finished — and the reply
-      // right BEFORE this transition is that step's finalized deliverable (the
-      // transition message itself is the NEXT step's intro, so we must not use
-      // it). File that prior reply into the finished step's section. Keyed to real
-      // step headers → content-immune and always the right slot; fill-if-empty →
-      // a clean STEP_SUMMARY always wins.
-      const prevReply = prevReplyRef.current;
-      const headerNums = stepHeaderNumbers(clean);
-      const advancedTo = headerNums.length ? Math.max(...headerNums) : 0;
-      if (advancedTo > curStepRef.current) {
-        const finished = curStepRef.current;
-        if (finished >= 1 && finished <= 17 && !(summaries[`ybr-${finished}`] || '').trim()) {
-          captureStepContentIfEmpty(`ybr-${finished}`, prevReply);
-        }
-        curStepRef.current = advancedTo;
-      }
-      // Step 17 never triggers a later advance, so capture it when it completes —
-      // its deliverable is the reply just before the final wrap-up.
-      if (stepKeys.includes('ybr-17') && !(summaries['ybr-17'] || '').trim()) {
-        captureStepContentIfEmpty('ybr-17', prevReply || clean);
-      }
-      prevReplyRef.current = clean;
     } catch (err) {
       // Drop the partial streaming bubble; the user's message stays so they can resend.
       setStreamingText(null);
@@ -783,34 +736,6 @@ export default function Chat() {
   // Progress view writes to, under the user's own session). If the walkthrough
   // was launched for a project, also save the mentor's output into that
   // project's matching step so the owner can review it later.
-  // Save a step's message into its project section, but only if that section is
-  // still empty — the backstop for when the mentor drops the STEP_SUMMARY block.
-  // Never overwrites an existing (clean) deliverable.
-  async function captureStepContentIfEmpty(stepKey, content) {
-    const projectId = threadIdRef.current || activeProjectRef.current;
-    const body = (content || '').trim();
-    if (!user?.id || !projectId || !stepKey || !body) return;
-    const { data } = await supabase
-      .from('project_steps')
-      .select('content')
-      .eq('project_id', projectId)
-      .eq('step_key', stepKey)
-      .maybeSingle();
-    if (data && data.content && data.content.trim()) return; // keep the existing deliverable
-    const { error } = await supabase.from('project_steps').upsert(
-      {
-        project_id: projectId,
-        user_id: user.id,
-        step_key: stepKey,
-        completed: true,
-        completed_at: new Date().toISOString(),
-        content: body,
-      },
-      { onConflict: 'project_id,step_key' }
-    );
-    if (!error) window.dispatchEvent(new Event('tinman:projects-changed'));
-  }
-
   function markStepsComplete(stepKeys, content, summaries = {}) {
     if (!user?.id || stepKeys.length === 0) return;
     const now = new Date().toISOString();

@@ -60,6 +60,21 @@ test('safety: ordinary double brackets a user might type are preserved', () => {
   assert.equal(r.stepKeys.length, 0);
 });
 
+// Regression: a message that FINISHES one step while introducing the next must
+// file the deliverable under the FINISHED step (ybr-6), never the next (ybr-7),
+// and never dump the whole message. This is the mis-attribution bug we removed
+// the guess-based backstop for.
+test('transition message: STEP_SUMMARY stays keyed to the finished step, not the next', () => {
+  const r = extractWalkthroughMarkers(
+    "Your power guarantee is locked in. Now let's move into Step 7 — Write Your Dream Buyer Avatar.\n" +
+      '[[STEP_DONE:ybr-6]]\n[[STEP_SUMMARY:ybr-6]]\n10-Year Rust-Through Warranty: if it rusts through, I fix it free.\n[[/STEP_SUMMARY]]'
+  );
+  assert.equal(r.summaries['ybr-6'], '10-Year Rust-Through Warranty: if it rusts through, I fix it free.');
+  assert.equal(r.summaries['ybr-7'], undefined);
+  assert.ok(r.stepKeys.includes('ybr-6'));
+  assert.ok(!/\[\[/.test(r.clean));
+});
+
 // ---- Fallback: infer completion when the mentor drops the hidden markers ----
 
 test('fallback: "Step N of 17" header marks all earlier steps', () => {
