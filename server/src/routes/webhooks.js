@@ -7,9 +7,18 @@ import { sendWelcomeEmail } from '../lib/email.js';
 
 const router = Router();
 
-const SECRET = process.env.CLICKFUNNELS_WEBHOOK_SECRET;
+// ClickFunnels signs each endpoint with its OWN secret, and we have three
+// (provision, cancel, reactivate). So CLICKFUNNELS_WEBHOOK_SECRET is read as a
+// comma-separated LIST and a signature is accepted if it matches ANY of them —
+// one env var covers every endpoint, and rotating one secret can't break the
+// others. A single secret is just a one-item list, so existing setups are
+// unaffected.
 const SECRET_PLACEHOLDER = 'PASTE_A_STRONG_RANDOM_WEBHOOK_SECRET_HERE';
-const secretConfigured = Boolean(SECRET && SECRET !== SECRET_PLACEHOLDER);
+const SECRETS = String(process.env.CLICKFUNNELS_WEBHOOK_SECRET || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s && s !== SECRET_PLACEHOLDER);
+const secretConfigured = SECRETS.length > 0;
 
 // Headers ClickFunnels (or a proxy) might use to carry the HMAC signature.
 // ClickFunnels 2.0's account-level outgoing webhooks send the first one; the
@@ -72,7 +81,10 @@ export function verifySignature(rawBuffer, headerValue, timestampValue) {
   if (!headerValue) return false;
   const provided = String(headerValue).replace(/^sha256=/i, '').trim();
 
-  // Preferred: ClickFunnels 2.0 timestamp-prefixed scheme.
+  // Preferred: ClickFunnels 2.0 timestamp-prefixed scheme. The signed payload is
+  // the same for every secret, so build it once — and only when the timestamp is
+  // present and fresh, which is what blocks replays.
+  let signedPayload = null;
   if (timestampValue) {
     const ts = String(timestampValue).trim();
     const tsNum = Number(ts);
@@ -80,19 +92,23 @@ export function verifySignature(rawBuffer, headerValue, timestampValue) {
     if (Number.isFinite(tsNum)) {
       const ageSeconds = Math.abs(Date.now() / 1000 - tsNum);
       if (ageSeconds <= TIMESTAMP_TOLERANCE_SECONDS) {
-        const signedPayload = Buffer.concat([
-          Buffer.from(`${ts}.`, 'utf8'),
-          rawBuffer,
-        ]);
-        const expected = crypto.createHmac('sha256', SECRET).update(signedPayload).digest('hex');
-        if (safeEqualHex(provided, expected)) return true;
+        signedPayload = Buffer.concat([Buffer.from(`${ts}.`, 'utf8'), rawBuffer]);
       }
     }
   }
 
-  // Fallback: signature over the raw body only (relays/proxies, legacy senders).
-  const expectedRaw = crypto.createHmac('sha256', SECRET).update(rawBuffer).digest('hex');
-  return safeEqualHex(provided, expectedRaw);
+  // Accept if ANY configured secret validates under either scheme: the request
+  // doesn't say which endpoint's secret signed it, so each is tried in turn.
+  for (const secret of SECRETS) {
+    if (signedPayload) {
+      const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
+      if (safeEqualHex(provided, expected)) return true;
+    }
+    // Fallback: signature over the raw body only (relays/proxies, legacy senders).
+    const expectedRaw = crypto.createHmac('sha256', secret).update(rawBuffer).digest('hex');
+    if (safeEqualHex(provided, expectedRaw)) return true;
+  }
+  return false;
 }
 
 // ClickFunnels payload shapes vary; pull the fields we need from common spots.
