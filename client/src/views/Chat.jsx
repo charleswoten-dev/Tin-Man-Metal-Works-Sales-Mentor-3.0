@@ -633,7 +633,14 @@ export default function Chat() {
     } catch (err) {
       // Drop the partial streaming bubble; the user's message stays so they can resend.
       setStreamingText(null);
-      setError("The Tin Man couldn't respond just now. Please try again.");
+      // A 401/403 carries copy written for the buyer — their session expired, or
+      // their access is no longer active and they should contact support.
+      // "Please try again" is wrong advice there and would leave them retrying
+      // forever without ever learning why.
+      const isAccessProblem = err?.status === 401 || err?.status === 403;
+      setError(
+        isAccessProblem ? err.message : "The Tin Man couldn't respond just now. Please try again."
+      );
       console.error(err);
     } finally {
       setSending(false);

@@ -66,13 +66,24 @@ export async function requireActiveBuyer(req, res, next) {
   let email;
   try {
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data?.user?.email) {
+    if (error) {
+      // Distinguish "this token is bad" from "we couldn't reach Supabase".
+      // supabase-js reports a network/5xx blip as a retryable error rather than
+      // throwing, and telling a paying buyer to sign in again during an outage
+      // is both wrong and useless — signing in would fail too. Ask them to retry.
+      if (error.name === 'AuthRetryableFetchError' || !error.status || error.status >= 500) {
+        console.error('[access] auth lookup unavailable:', error.message || error);
+        return res.status(503).json({ error: 'Could not verify your access right now. Please try again.' });
+      }
+      return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+    }
+    if (!data?.user?.email) {
       return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
     }
     email = data.user.email;
   } catch (err) {
     console.error('[access] token verification failed:', err?.message || err);
-    return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+    return res.status(503).json({ error: 'Could not verify your access right now. Please try again.' });
   }
 
   try {

@@ -9,6 +9,7 @@ import {
 } from '../lib/adminAuth.js';
 import { generateUniqueLicenseKey } from '../lib/licenseKey.js';
 import { sendWelcomeEmail } from '../lib/email.js';
+import { reactivateBuyer } from '../lib/reactivate.js';
 
 const router = Router();
 
@@ -313,13 +314,23 @@ router.post('/buyers/:id/deactivate', async (req, res) => {
   }
 });
 
+// Restore a buyer's access. Uses the same helper as the ClickFunnels webhooks,
+// because flipping `active` alone is NOT enough: revoking (here or on churn)
+// also revokes their license, and access is entitlement-checked per request —
+// so an active buyer with only revoked licenses stays locked out. This button
+// used to do exactly that and report success.
 router.post('/buyers/:id/reactivate', async (req, res) => {
   try {
-    const { error } = await supabaseAdmin
+    const { data: buyer, error: findErr } = await supabaseAdmin
       .from('approved_buyers')
-      .update({ active: true })
-      .eq('id', req.params.id);
-    if (error) throw error;
+      .select('email')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (findErr) throw findErr;
+    if (!buyer?.email) return res.status(404).json({ error: 'Buyer not found.' });
+
+    const result = await reactivateBuyer({ email: buyer.email });
+    if (!result.found) return res.status(404).json({ error: 'Buyer not found.' });
     return res.json({ ok: true });
   } catch (err) {
     console.error('[admin] reactivate buyer error:', err?.message || err);

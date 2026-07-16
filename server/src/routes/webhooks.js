@@ -4,6 +4,7 @@ import express from 'express';
 import { supabaseAdmin, isAdminConfigured } from '../lib/supabaseAdmin.js';
 import { generateUniqueLicenseKey } from '../lib/licenseKey.js';
 import { sendWelcomeEmail } from '../lib/email.js';
+import { reactivateBuyer } from '../lib/reactivate.js';
 
 const router = Router();
 
@@ -207,67 +208,6 @@ async function receive(req, res, tag) {
     return null;
   }
   return fields;
-}
-
-// Restore access for a buyer who already exists — a returning buyer whose plan
-// churned and came back, or simply a retried/duplicate event.
-//
-// Deliberately only touches approved_buyers and licenses: a returning buyer's
-// profile, projects and chat history must survive the lapse and be waiting for
-// them exactly as they left it. Nothing here wipes or re-creates user data.
-//
-// Idempotent: when they're already active with a usable key it writes nothing
-// and reports changed:false.
-async function reactivateBuyer({ email, orderId }) {
-  const { data: buyer, error: buyerErr } = await supabaseAdmin
-    .from('approved_buyers')
-    .select('id, active, license_key')
-    .eq('email', email)
-    .maybeSingle();
-  if (buyerErr) throw buyerErr;
-  if (!buyer) return { found: false };
-
-  // Their newest key is the one they'd activate with (or already have).
-  const { data: licenses, error: licErr } = await supabaseAdmin
-    .from('licenses')
-    .select('id, key, revoked, used')
-    .eq('email', email)
-    .order('created_at', { ascending: false })
-    .limit(1);
-  if (licErr) throw licErr;
-  const license = licenses?.[0] || null;
-
-  if (buyer.active && license && !license.revoked) {
-    return { found: true, changed: false, licenseKey: license.key, used: license.used };
-  }
-
-  let licenseKey = license?.key || null;
-  let used = license?.used ?? false;
-
-  if (!license) {
-    // Anomaly: an approved buyer with no key at all. Issue a fresh one so they
-    // have something to register with.
-    licenseKey = await generateUniqueLicenseKey();
-    used = false;
-    const { error } = await supabaseAdmin
-      .from('licenses')
-      .insert({ key: licenseKey, email, order_id: orderId, used: false });
-    if (error) throw error;
-  } else if (license.revoked) {
-    const { error } = await supabaseAdmin
-      .from('licenses')
-      .update({ revoked: false, revoked_at: null })
-      .eq('id', license.id);
-    if (error) throw error;
-  }
-
-  const patch = { active: true };
-  if (licenseKey && licenseKey !== buyer.license_key) patch.license_key = licenseKey;
-  if (orderId) patch.order_id = orderId;
-  const { error: updErr } = await supabaseAdmin.from('approved_buyers').update(patch).eq('id', buyer.id);
-  if (updErr) throw updErr;
-
-  return { found: true, changed: true, licenseKey, used };
 }
 
 // A reactivated buyer who never got as far as activating their account still

@@ -14,6 +14,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //
 // getSession() can hang if the Supabase project is unreachable (see
 // AuthContext), so cap the wait: a slow auth lookup must not freeze the request.
+// Build an Error from a failed response, carrying the server's own message plus
+// the status/code so callers can tell an access problem from a hiccup. A 401/403
+// body is copy written FOR the buyer ("your session expired", "your access isn't
+// active — contact support"); showing a generic "try again" there would leave a
+// churned buyer retrying forever with no idea why.
+async function httpError(res, path) {
+  let msg = `API ${path} failed: ${res.status}`;
+  let code;
+  try {
+    const j = await res.json();
+    if (j?.error) msg = j.error;
+    code = j?.code;
+  } catch {
+    /* no JSON body */
+  }
+  const err = new Error(msg);
+  err.status = res.status;
+  err.code = code;
+  return err;
+}
+
 async function authHeaders() {
   try {
     const { data } = await Promise.race([
@@ -47,19 +68,7 @@ export async function apiPost(path, body, { retries = 2, backoffMs = 600 } = {})
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        // Prefer the server's own message — a 401/403 here carries copy meant
-        // for the buyer ("your session expired", "your access isn't active"),
-        // which is far more useful than a bare status code.
-        let msg = `API ${path} failed: ${res.status}`;
-        try {
-          const j = await res.json();
-          if (j?.error) msg = j.error;
-        } catch {
-          /* no JSON body */
-        }
-        throw new Error(msg);
-      }
+      if (!res.ok) throw await httpError(res, path);
       return res.json();
     } catch (err) {
       // Only retry transient connection drops, and only while attempts remain.
@@ -97,14 +106,7 @@ export async function apiStream(path, body, onText, { idleMs = 40000 } = {}) {
   });
   if (!res.ok || !res.body) {
     clearTimeout(idleTimer);
-    let msg = `API ${path} failed: ${res.status}`;
-    try {
-      const j = await res.json();
-      if (j?.error) msg = j.error;
-    } catch {
-      /* no JSON body */
-    }
-    throw new Error(msg);
+    throw await httpError(res, path);
   }
 
   const reader = res.body.getReader();
