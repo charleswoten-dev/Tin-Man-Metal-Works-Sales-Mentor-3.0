@@ -2,8 +2,15 @@ import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildProfileBlock, buildShopRateBlock, buildDreamBuyersBlock } from '../lib/systemPrompt.js';
 import { MAX_CONTINUATIONS, CONTINUE_MSG, textOf, generateWithContinuation } from '../lib/continuation.js';
+import { requireActiveBuyer } from '../lib/buyerAccess.js';
 
 const router = Router();
+
+// Every chat endpoint requires a signed-in buyer whose access is still active.
+// Checked per request, not just at login, so a churned subscription stops
+// working on the buyer's next message rather than whenever they next sign in.
+// This also means the Anthropic key can only ever be spent by a paying buyer.
+router.use(requireActiveBuyer);
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const PLACEHOLDER = 'PASTE_YOUR_NEW_ROTATED_KEY_HERE';
 
