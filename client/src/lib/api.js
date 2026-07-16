@@ -1,8 +1,31 @@
 // Thin wrapper for talking to the Tin Man backend.
 // In dev, Vite proxies /api → http://localhost:3001 (see vite.config.js).
+import { supabase } from './supabase.js';
+
 const BASE = import.meta.env.VITE_API_BASE || '';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Every backend call carries the caller's Supabase access token so the server
+// can confirm they're still an active buyer on each request (access can end
+// mid-session when a subscription churns). Registration runs before a session
+// exists, so having no token here is normal — those routes don't require one
+// and the server rejects unauthenticated calls to the ones that do.
+//
+// getSession() can hang if the Supabase project is unreachable (see
+// AuthContext), so cap the wait: a slow auth lookup must not freeze the request.
+async function authHeaders() {
+  try {
+    const { data } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((resolve) => setTimeout(() => resolve({ data: null }), 5000)),
+    ]);
+    const token = data?.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
 
 // A network-level failure (TypeError "Failed to fetch") means the request never
 // got a response — the dev server briefly dropped the connection (e.g. a
@@ -21,10 +44,22 @@ export async function apiPost(path, body, { retries = 2, backoffMs = 600 } = {})
     try {
       const res = await fetch(`${BASE}/api${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+      if (!res.ok) {
+        // Prefer the server's own message — a 401/403 here carries copy meant
+        // for the buyer ("your session expired", "your access isn't active"),
+        // which is far more useful than a bare status code.
+        let msg = `API ${path} failed: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {
+          /* no JSON body */
+        }
+        throw new Error(msg);
+      }
       return res.json();
     } catch (err) {
       // Only retry transient connection drops, and only while attempts remain.
@@ -56,7 +91,7 @@ export async function apiStream(path, body, onText, { idleMs = 40000 } = {}) {
 
   const res = await fetch(`${BASE}/api${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
     signal: controller.signal,
   });
@@ -121,7 +156,7 @@ export async function apiStream(path, body, onText, { idleMs = 40000 } = {}) {
 export async function apiPostSafe(path, body) {
   const res = await fetch(`${BASE}/api${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
   let data = null;
